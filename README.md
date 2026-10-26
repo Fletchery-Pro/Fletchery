@@ -4,7 +4,7 @@
 
 **The routing and compliance layer for tokenized stocks.**
 
-*Fletchery (n.): the craft of making arrows that fly true.*
+*Fletchery: the craft of making arrows that fly true.*
 
 [![CI](https://github.com/Fletchery-Pro/Fletchery/actions/workflows/ci.yml/badge.svg)](https://github.com/Fletchery-Pro/Fletchery/actions/workflows/ci.yml) ![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Status: prototype](https://img.shields.io/badge/status-prototype-lightgrey)
 
