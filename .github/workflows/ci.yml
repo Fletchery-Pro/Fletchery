@@ -1,0 +1,21 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Contracts
+        working-directory: contracts
+        run: forge test
+      - name: Engine
+        working-directory: engine
+        run: npm install --no-audit --no-fund && npx tsc --noEmit && node --test test/*.test.ts
+      - name: End to end
+        run: bash scripts/e2e.sh

@@ -1,0 +1,447 @@
+<title>Fletchery Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a broker's operations console. Summary strip → live router → safety chart → caps → proof.
+   Cool "settlement paper" neutrals, slate ink, one indigo accent; venue colors only inside charts. */
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --ink: #141a22;
+  --ink-2: #4a5462;
+  --ink-3: #7a8494;
+  --rule: #dfe4ea;
+  --rule-strong: #c6cdd6;
+  --accent: #3446c9;
+  --accent-soft: #e6e9fb;
+  --band: #e9ecf2;
+  --closed: #eef0f4;
+  --good: #0a7d0a; --good-bg: #e3f3e3;
+  --warn: #9a6400; --warn-bg: #fdf1d8;
+  --bad: #c03030; --bad-bg: #fbe5e5;
+  --v1: #2a78d6; --v2: #eb6834; --v3: #1baf7a; --v4: #eda100; --v5: #e87ba4;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1318; --panel: #171c23; --ink: #e9edf2; --ink-2: #aab3c0; --ink-3: #7d8796;
+    --rule: #262d37; --rule-strong: #343d49; --accent: #8c9bff; --accent-soft: #232a4d;
+    --band: #222833; --closed: #1b2028;
+    --good: #5cc75c; --good-bg: #16301a; --warn: #f0b444; --warn-bg: #33280f; --bad: #f07575; --bad-bg: #3a1b1d;
+    --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1318; --panel: #171c23; --ink: #e9edf2; --ink-2: #aab3c0; --ink-3: #7d8796;
+  --rule: #262d37; --rule-strong: #343d49; --accent: #8c9bff; --accent-soft: #232a4d;
+  --band: #222833; --closed: #1b2028;
+  --good: #5cc75c; --good-bg: #16301a; --warn: #f0b444; --warn-bg: #33280f; --bad: #f07575; --bad-bg: #3a1b1d;
+  --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 30px; font-weight: 700; }
+h2 { font-size: 19px; font-weight: 700; }
+p { margin: 0; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+.small { font-size: 12.5px; }
+.eyebrow { font: 500 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; border-bottom: 1px solid var(--rule-strong); padding-bottom: 18px; }
+header.top .lede { max-width: 68ch; color: var(--ink-2); margin-top: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1 var(--font-mono); padding: 6px 9px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.kpi { background: var(--panel); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+@media (max-width: 700px) { .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.kpi .v { font: 500 24px/1.1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12.5px; color: var(--ink-2); }
+
+section.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
+.panel-head p { max-width: 70ch; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* router form */
+form.order { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: end; }
+label.f { display: grid; gap: 5px; font-size: 12px; color: var(--ink-2); }
+select, input[type=number] { font: 500 14px var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule-strong); border-radius: 7px; padding: 8px 10px; width: 100%; }
+select:focus-visible, input:focus-visible, button:focus-visible, .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; grid-column: 1 / -1; }
+.toggles label { display: inline-flex; gap: 7px; align-items: center; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.toggles input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.alloc { display: flex; height: 30px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--panel); }
+.alloc div { min-width: 2px; }
+.alloc-empty { height: 30px; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--band) 0 6px, transparent 6px 12px); border: 1px dashed var(--rule-strong); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.sw.line { height: 3px; width: 14px; border-radius: 2px; }
+
+.result { display: grid; gap: 14px; }
+.headline { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline; }
+.headline .big { font: 500 22px var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font: 500 11px/1.2 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td.r, th.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font: 500 11.5px/1 var(--font-mono); padding: 4px 7px; border-radius: 5px; white-space: nowrap; }
+.chip.ok { background: var(--good-bg); color: var(--good); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+
+.seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 12.5px var(--font-mono); background: transparent; color: var(--ink-2); border: 0; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule-strong); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+
+/* chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px var(--font-mono); fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--rule-strong); border-radius: 8px; padding: 9px 11px; font-size: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); min-width: 190px; display: grid; gap: 3px; z-index: 2; }
+.tip[hidden] { display: none; }
+.tip .row { display: flex; justify-content: space-between; gap: 14px; }
+.tip .row span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* caps */
+.caps { display: grid; gap: 10px; }
+.cap-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 120px; gap: 12px; align-items: center; }
+.cap-bar { height: 12px; background: var(--band); border-radius: 4px; overflow: hidden; }
+.cap-bar div { height: 100%; border-radius: 4px; }
+@media (max-width: 560px) { .cap-row { grid-template-columns: minmax(0, 1fr) auto; } .cap-row .cap-bar { grid-column: 1 / -1; grid-row: 2; } }
+
+/* timeline */
+ol.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+ol.timeline li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--rule); }
+ol.timeline li:first-child { border-top: 0; }
+ol.timeline .when { font: 12px/1.4 var(--font-mono); color: var(--ink-3); }
+ol.timeline .what { display: grid; gap: 3px; min-width: 0; }
+ol.timeline .what b { font-weight: 600; }
+@media (max-width: 560px) { ol.timeline li { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+.steps td:first-child { width: 28px; }
+.mark { font: 600 13px var(--font-mono); }
+.mark.ok { color: var(--good); }
+.mark.no { color: var(--bad); }
+.hash { font: 12px var(--font-mono); word-break: break-all; color: var(--ink-2); }
+footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--rule); padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { .alloc div, .cap-bar div { transition: flex-grow .35s ease, width .35s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Fletchery · broker gateway to SEC tokenized-stock venues</div>
+      <h1>Fletchery Console</h1>
+      <p class="lede">One integration that lets a broker route its customers' tokenized-stock orders across every compliant venue, with venue caps, halts, fair-value bands, AI-agent limits and an audit trail enforced on each fill.</p>
+    </div>
+    <span class="badge" title="All prices, depths, caps and flows are illustrative">● Simulated week · 26 Oct – 2 Nov 2026</span>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="panel" aria-labelledby="router-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="router-h">Route an order</h2>
+        <p class="muted small">This runs the real Fletchery routing engine in your browser. Change the order and watch which venues it uses, which it skips, and why.</p>
+      </div>
+      <button type="button" id="reset" class="seg" style="padding:7px 12px;font:500 12.5px var(--font-mono);background:transparent;color:var(--ink-2);cursor:pointer">Reset venues</button>
+    </div>
+    <form class="order" id="order" onsubmit="return false">
+      <label class="f" for="f-sym">Stock
+        <select id="f-sym"><option>AAPL</option><option>NVDA</option><option>TSLA</option><option>AMC</option></select>
+      </label>
+      <label class="f" for="f-side">Side
+        <select id="f-side"><option value="BUY">Buy</option><option value="SELL">Sell</option></select>
+      </label>
+      <label class="f" for="f-sh">Shares
+        <input id="f-sh" type="number" min="1" step="1" value="4000">
+      </label>
+      <label class="f" for="f-cl">Customer
+        <select id="f-cl"><option value="840">United States</option><option value="826">United Kingdom</option><option value="408">North Korea (sanctioned)</option></select>
+      </label>
+      <label class="f" for="f-when">When
+        <select id="f-when">
+          <option value="2026-10-26T10:30:00-04:00">Mon 10:30 · regular hours</option>
+          <option value="2026-10-26T22:00:00-04:00">Mon 22:00 · overnight</option>
+          <option value="2026-10-31T12:00:00-04:00" selected>Sat 12:00 · market closed</option>
+        </select>
+      </label>
+      <label class="f" for="f-del">Delivery
+        <select id="f-del"><option value="TOKEN">Token to wallet</option><option value="ANY">Brokerage position</option></select>
+      </label>
+      <div class="toggles">
+        <label for="t-wl"><input type="checkbox" id="t-wl"> Venue B has whitelisted the Fletchery router</label>
+        <label for="t-halt"><input type="checkbox" id="t-halt"> Exchange has halted this stock</label>
+        <label for="t-cap"><input type="checkbox" id="t-cap"> Late in the month (caps 95% used)</label>
+      </div>
+    </form>
+    <div class="result" id="result" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="guard-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="guard-h">Weekend Guard: fair value and allowed band</h2>
+        <p class="muted small">The dark line is Fletchery's fair value; the shaded band is the price range a venue pool may trade in. Shaded columns mark hours the stock exchange is shut. Hover for exact values.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Stock" id="sym-seg"></div>
+    </div>
+    <div class="legend" id="guard-legend"></div>
+    <div class="chart" id="guard-chart"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="caps-h">
+      <div class="panel-head">
+        <div>
+          <h2 id="caps-h">Monthly volume caps</h2>
+          <p class="muted small">SEC Tier 1 venues may trade at most 0.25% of last month's average daily volume per stock. Fletchery rejects any fill that would cross it.</p>
+        </div>
+      </div>
+      <div class="caps" id="caps"></div>
+    </section>
+    <section class="panel" aria-labelledby="bx-h">
+      <div class="panel-head">
+        <div>
+          <h2 id="bx-h">Where the week's orders went</h2>
+          <p class="muted small">Share of filled dollar volume by venue, and the dollar-weighted average fill against fair value (positive means the customer paid more than fair value).</p>
+        </div>
+      </div>
+      <div class="alloc" id="share-bar" role="img" aria-label="Share of volume by venue"></div>
+      <div class="tbl-wrap"><table id="bx"></table></div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Why venues were skipped</div>
+        <div class="tbl-wrap"><table id="reasons"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="tl-h">What happened this week</h2>
+        <p class="muted small">Scripted moments in the simulation, each handled by a different Fletchery module.</p>
+      </div>
+    </div>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <section class="panel" aria-labelledby="oc-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="oc-h">Proof on a real chain</h2>
+        <p class="muted small">The same rules running as smart contracts on a local Ethereum chain with Uniswap v4's own pool code. Each refusal below came back from the chain itself.</p>
+      </div>
+      <span class="chip info" id="oc-score"></span>
+    </div>
+    <div class="tbl-wrap"><table class="steps" id="steps"></table></div>
+    <p class="small muted">Audit log head anchored on-chain: <span class="hash" id="oc-head"></span></p>
+  </section>
+
+  <footer>
+    <p>All market data on this page is simulated. Venue names are generic placeholders; prices, depths, caps and flows are illustrative and say nothing about those venues' real activity.</p>
+    <p id="foot-meta"></p>
+  </footer>
+</div>
+
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+const DATA = /*__DATA__*/;
+(function () {
+  const E = window.FletcheryEngine;
+  const S = DATA.scenario, OC = DATA.onchain;
+  const VCOL = { 'venue-a': 'var(--v1)', 'venue-b': 'var(--v2)', 'venue-c': 'var(--v3)', 'offshore': 'var(--v4)', 'primary': 'var(--v5)' };
+  const VNAME = Object.fromEntries(S.venues.map(v => [v.id, v.name]));
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const usd = (x, d = 2) => '$' + Number(x).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const int = x => Math.round(x).toLocaleString('en-US');
+  const bps = x => (x >= 0 ? '+' : '') + x.toFixed(1) + ' bps';
+  const nyFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const ny = ts => nyFmt.format(new Date(ts));
+
+  // ── KPIs ──
+  const be = S.bestEx;
+  const refused = be.rejected;
+  const kpis = [
+    ['Orders routed', int(be.orders), `${int(be.filled)} filled · ${int(be.partial)} partial`],
+    ['Refused with a reason', int(refused), 'mandate limits, halts, caps, no eligible venue'],
+    ['Avg fill vs fair value', bps(be.avgSlippageVsFairBps), 'across all filled orders'],
+    ['Better than best single venue', bps(be.avgImprovementVsBestSingleVenueBps ?? 0), 'average, orders both could fill'],
+    ['Audit log', S.audit.verified ? 'Intact' : 'Broken', `${int(S.audit.entries)} entries · ${S.audit.anchors.length} on-chain anchors`],
+  ];
+  $('kpis').innerHTML = kpis.map(([k, v, d]) => `<div class="kpi"><div class="eyebrow">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+
+  // ── Router playground ──
+  const P = DATA.playground;
+  let venues;
+  function freshVenues() {
+    const late = $('t-cap').checked;
+    const capUsed = late ? Object.fromEntries(Object.keys(P.prices).map(s => [s, 0.95])) : P.capUsed;
+    venues = E.defaultVenues(P.prices, { adv: P.adv, capUsed });
+    for (const v of venues) { const p = v.pools.AMC; if (p && v.kind !== 'PRIMARY') { p.stock /= 80; p.cash /= 80; } }
+  }
+  function runRoute() {
+    const sym = $('f-sym').value;
+    const ts = Date.parse($('f-when').value);
+    for (const v of venues) {
+      v.fletcheryWhitelisted = v.id === 'venue-b' ? $('t-wl').checked : true;
+      $('t-halt').checked ? v.halted.add(sym) : v.halted.delete(sym);
+    }
+    const sess = E.sessionAt(ts);
+    const open = sess === E.Session.REGULAR || sess === E.Session.EXTENDED;
+    const ref = { symbol: sym, lastClose: P.prices[sym], nbboMid: open ? P.prices[sym] : undefined, annualVol: P.vol[sym], beta: P.beta[sym], observations: [] };
+    const fv = E.computeFairValue(ref, ts);
+    const shares = Math.max(1, Number($('f-sh').value) || 1);
+    const order = { id: 'demo', account: 'demo', jurisdiction: Number($('f-cl').value), symbol: sym, side: $('f-side').value, shares, delivery: $('f-del').value, tsMs: ts };
+    const plan = E.route(order, venues, fv);
+    renderPlan(plan, fv, order);
+  }
+  function renderPlan(plan, fv, order) {
+    const total = plan.filled || 0;
+    const legs = [...plan.legs].sort((a, b) => b.shares - a.shares);
+    const sessName = E.SESSION_NAME[plan.session];
+    const status = plan.filled <= 1e-9 ? ['bad', 'Not routable'] : plan.unfilled > 1e-6 ? ['warn', `Partial · ${int(plan.unfilled)} unfilled`] : ['ok', 'Fully routable'];
+    const bar = total > 0
+      ? `<div class="alloc" role="img" aria-label="Allocation by venue">${legs.map(l => `<div title="${esc(VNAME[l.venueId])}: ${int(l.shares)} shares" style="flex-grow:${l.shares};background:${VCOL[l.venueId]}"></div>`).join('')}</div>`
+      : `<div class="alloc-empty" role="img" aria-label="No allocation"></div>`;
+    const improve = plan.improvementVsSingleBps !== undefined
+      ? `${bps(plan.improvementVsSingleBps)} better than the best single venue (${esc(VNAME[plan.bestSingleVenue.venueId])})`
+      : plan.bestSingleVenue ? `best single venue could fill only ${int(plan.bestSingleVenue.filled)} shares` : '';
+    const rows = legs.map(l => `<tr><td><span class="legend"><span><i class="sw" style="background:${VCOL[l.venueId]}"></i>${esc(VNAME[l.venueId])}</span></span></td><td class="r">${int(l.shares)}</td><td class="r">${(l.shares / total * 100).toFixed(1)}%</td><td class="r">${usd(l.avgPrice, l.avgPrice < 10 ? 4 : 2)}</td><td class="r">${usd(l.postPrice, l.postPrice < 10 ? 4 : 2)}</td></tr>`).join('');
+    const skipped = plan.rejected.filter(r => r.reason !== 'eligible but not competitive / capacity' || true).map(r => `<tr><td>${esc(VNAME[r.venueId])}</td><td class="muted">${esc(r.reason)}</td></tr>`).join('');
+    $('result').innerHTML = `
+      <div class="headline">
+        <span class="chip ${status[0]}">${status[1]}</span>
+        ${total > 0 ? `<span class="big">${int(total)} sh @ ${usd(plan.avgPrice, plan.avgPrice < 10 ? 4 : 2)}</span>` : ''}
+        <span class="muted small">Fair value ${usd(fv.price, fv.price < 10 ? 4 : 2)} · band ${usd(fv.lowBand, fv.price < 10 ? 3 : 2)}–${usd(fv.highBand, fv.price < 10 ? 3 : 2)} · ${sessName}</span>
+      </div>
+      ${bar}
+      ${total > 0 ? `<p class="small muted">${bps(plan.slippageVsFairBps)} vs fair value${improve ? ' · ' + improve : ''}</p>` : ''}
+      <div class="grid2">
+        <div class="tbl-wrap">${legs.length ? `<table><thead><tr><th>Venue</th><th class="r">Shares</th><th class="r">Share</th><th class="r">Avg price</th><th class="r">Pool after</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted small">No venue can take this order right now. The reasons are listed alongside.</p>'}</div>
+        <div class="tbl-wrap"><table><thead><tr><th>Venue not used</th><th>Reason</th></tr></thead><tbody>${skipped || '<tr><td colspan="2" class="muted">Every venue took part.</td></tr>'}</tbody></table></div>
+      </div>`;
+  }
+  freshVenues(); runRoute();
+  for (const id of ['f-sym', 'f-side', 'f-sh', 'f-cl', 'f-when', 'f-del', 't-wl', 't-halt']) $(id).addEventListener('input', runRoute);
+  $('t-cap').addEventListener('input', () => { freshVenues(); runRoute(); });
+  $('reset').addEventListener('click', () => { freshVenues(); runRoute(); });
+
+  // ── Weekend Guard chart ──
+  const SYMS = Object.keys(S.samples);
+  let curSym = 'AMC';
+  $('sym-seg').innerHTML = SYMS.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === curSym}">${s}</button>`).join('');
+  $('sym-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; curSym = b.dataset.s; for (const x of $('sym-seg').children) x.setAttribute('aria-pressed', x.dataset.s === curSym); drawGuard(); });
+  const GV = ['venue-a', 'venue-b', 'venue-c', 'offshore'];
+  $('guard-legend').innerHTML = `<span><i class="sw line" style="background:var(--ink)"></i>Fair value</span><span><i class="sw" style="background:var(--band);border:1px solid var(--rule-strong)"></i>Allowed band</span>` + GV.map(v => `<span><i class="sw line" style="background:${VCOL[v]}"></i>${esc(VNAME[v])}${/pool$/i.test(VNAME[v]) ? '' : ' pool'}</span>`).join('') + `<span><i class="sw" style="background:var(--closed);border:1px solid var(--rule)"></i>Exchange shut</span>`;
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+    const t = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) t.push(+v.toFixed(6));
+    return t;
+  }
+  function drawGuard() {
+    const pts = S.samples[curSym];
+    const host = $('guard-chart');
+    const W = Math.max(320, host.clientWidth || 900), H = W < 560 ? 260 : 320;
+    const m = { l: 56, r: 12, t: 10, b: 28 };
+    const x0 = pts[0].ts, x1 = pts[pts.length - 1].ts;
+    let lo = Infinity, hi = -Infinity;
+    for (const p of pts) { lo = Math.min(lo, p.lo, ...GV.map(v => p.venues[v])); hi = Math.max(hi, p.hi, ...GV.map(v => p.venues[v])); }
+    const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+    const X = t => m.l + (t - x0) / (x1 - x0) * (W - m.l - m.r);
+    const Y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+    const dec = hi < 10 ? 2 : 0;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${curSym} fair value, band and venue pool prices over the week">`;
+    // shut-exchange columns
+    for (let i = 0; i < pts.length - 1; i++) if (pts[i].session === 'CLOSED' || pts[i].session === 'OVERNIGHT') {
+      svg += `<rect x="${X(pts[i].ts)}" y="${m.t}" width="${X(pts[i + 1].ts) - X(pts[i].ts) + 0.5}" height="${H - m.t - m.b}" fill="var(--closed)"/>`;
+    }
+    for (const t of niceTicks(lo, hi, 5)) svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--rule)" stroke-width="1"/><text x="${m.l - 8}" y="${Y(t) + 4}" text-anchor="end">${t.toFixed(dec)}</text>`;
+    // day ticks at New York midnight
+    const days = []; for (const p of pts) { const h = ny(p.ts); if (h.endsWith('00:00')) days.push(p); }
+    for (const d of days) { const lab = ny(d.ts).slice(0, 3); svg += `<line x1="${X(d.ts)}" x2="${X(d.ts)}" y1="${H - m.b}" y2="${H - m.b + 4}" stroke="var(--rule-strong)"/><text x="${X(d.ts) + 4}" y="${H - 8}">${lab}</text>`; }
+    const band = pts.map(p => `${X(p.ts)},${Y(p.hi)}`).join(' ') + ' ' + [...pts].reverse().map(p => `${X(p.ts)},${Y(p.lo)}`).join(' ');
+    svg += `<polygon points="${band}" fill="var(--band)" fill-opacity="0.85" stroke="var(--rule-strong)" stroke-width="1"/>`;
+    for (const v of GV) svg += `<polyline points="${pts.map(p => `${X(p.ts)},${Y(p.venues[v])}`).join(' ')}" fill="none" stroke="${VCOL[v]}" stroke-width="1.5" stroke-linejoin="round" opacity="0.9"/>`;
+    svg += `<polyline points="${pts.map(p => `${X(p.ts)},${Y(p.fv)}`).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2.25" stroke-linejoin="round"/>`;
+    // events on this symbol
+    for (const e of S.timeline.filter(e => e.kind === 'guard' && e.title.includes(curSym))) svg += `<line x1="${X(e.ts)}" x2="${X(e.ts)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="${X(e.ts) > W * 0.6 ? X(e.ts) - 5 : X(e.ts) + 5}" text-anchor="${X(e.ts) > W * 0.6 ? 'end' : 'start'}" y="${m.t + 12}" style="fill:var(--accent)">${esc(e.title.split(' ').slice(0, 4).join(' '))}</text>`;
+    svg += `<line id="xh" y1="${m.t}" y2="${H - m.b}" stroke="var(--ink-3)" stroke-width="1" visibility="hidden"/><circle id="xd" r="4" fill="var(--ink)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>`;
+    svg += `<rect x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent" id="hit"/></svg><div class="tip" id="tip" hidden></div>`;
+    host.innerHTML = svg;
+    const hit = host.querySelector('#hit'), tip = host.querySelector('#tip'), xh = host.querySelector('#xh'), xd = host.querySelector('#xd');
+    const svgEl = host.querySelector('svg');
+    const move = ev => {
+      const r = svgEl.getBoundingClientRect(); const sx = (ev.clientX - r.left) * W / r.width;
+      const t = x0 + (sx - m.l) / (W - m.l - m.r) * (x1 - x0);
+      let p = pts[0]; for (const q of pts) if (Math.abs(q.ts - t) < Math.abs(p.ts - t)) p = q;
+      xh.setAttribute('x1', X(p.ts)); xh.setAttribute('x2', X(p.ts)); xh.setAttribute('visibility', 'visible');
+      xd.setAttribute('cx', X(p.ts)); xd.setAttribute('cy', Y(p.fv)); xd.setAttribute('visibility', 'visible');
+      const f = v => usd(v, p.fv < 10 ? 3 : 2);
+      tip.innerHTML = `<b>${ny(p.ts)} New York · ${p.session.toLowerCase()}</b><div class="row"><span>Fair value</span><span>${f(p.fv)}</span></div><div class="row"><span>Band</span><span>${f(p.lo)}–${f(p.hi)}</span></div>` + GV.map(v => `<div class="row"><span><i class="sw" style="background:${VCOL[v]}"></i> ${esc(VNAME[v])}</span><span>${f(p.venues[v])}</span></div>`).join('');
+      tip.hidden = false;
+      const px = X(p.ts) * r.width / W; const tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, px + 14), r.width - tw) + 'px'; tip.style.top = '8px';
+      if (px + 14 + tw > r.width) tip.style.left = Math.max(0, px - tw - 14) + 'px';
+    };
+    hit.addEventListener('pointermove', move);
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); xd.setAttribute('visibility', 'hidden'); });
+  }
+  drawGuard();
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawGuard, 120); });
+
+  // ── Caps ──
+  const capCls = { OK: ['ok', 'OK'], WATCH: ['warn', 'Watch'], EXHAUSTED: ['bad', 'Cap reached'] };
+  $('caps').innerHTML = S.caps.map(c => {
+    const pct = Math.min(100, c.utilisationPct);
+    const col = c.status === 'EXHAUSTED' ? 'var(--bad)' : c.status === 'WATCH' ? 'var(--warn)' : 'var(--accent)';
+    return `<div class="cap-row"><div class="small"><b>${c.symbol}</b> <span class="muted">· ${esc(VNAME[c.venueId])}</span></div><div class="cap-bar" title="${int(c.used)} of ${int(c.cap)} shares"><div style="width:${pct}%;background:${col}"></div></div><div style="display:flex;gap:8px;justify-content:end;align-items:center"><span class="num small">${pct.toFixed(0)}%</span><span class="chip ${capCls[c.status][0]}">${capCls[c.status][1]}</span></div></div>`;
+  }).join('');
+
+  // ── Best execution ──
+  $('share-bar').innerHTML = be.venues.map(v => `<div title="${esc(VNAME[v.venueId])} ${v.shareOfVolumePct}%" style="flex-grow:${v.notional};background:${VCOL[v.venueId]}"></div>`).join('');
+  $('bx').innerHTML = `<thead><tr><th>Venue</th><th class="r">Volume</th><th class="r">Fills</th><th class="r">vs fair value</th></tr></thead><tbody>` + be.venues.map(v => `<tr><td><span class="legend"><span><i class="sw" style="background:${VCOL[v.venueId]}"></i>${esc(VNAME[v.venueId])}</span></span></td><td class="r">${v.shareOfVolumePct.toFixed(1)}%</td><td class="r">${int(v.legs)}</td><td class="r">${bps(v.avgVsFairBps)}</td></tr>`).join('') + '</tbody>';
+  const reasons = Object.entries(be.rejectionReasons).filter(([r]) => !r.startsWith('eligible but')).sort((a, b) => b[1] - a[1]);
+  $('reasons').innerHTML = `<thead><tr><th>Reason</th><th class="r">Times</th></tr></thead><tbody>` + reasons.map(([r, n]) => `<tr><td>${esc(r)}</td><td class="r">${int(n)}</td></tr>`).join('') + '</tbody>';
+
+  // ── Timeline ──
+  const KIND = { route: ['info', 'Execution'], access: ['info', 'Access'], halt: ['warn', 'Safety · halt'], reject: ['bad', 'Refused'], agent: ['info', 'AI agent'], cap: ['warn', 'Compliance · cap'], guard: ['warn', 'Weekend Guard'] };
+  $('timeline').innerHTML = S.timeline.map(e => `<li><div class="when">${ny(e.ts)}</div><div class="what"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip ${KIND[e.kind][0]}">${KIND[e.kind][1]}</span><b>${esc(e.title)}</b></div><span class="muted small">${esc(e.detail)}</span></div></li>`).join('');
+
+  // ── On-chain proof ──
+  const ok = OC.results.filter(r => r.ok).length;
+  $('oc-score').textContent = `${ok}/${OC.results.length} behaved as designed`;
+  $('steps').innerHTML = `<thead><tr><th></th><th>Step</th><th>What the chain returned</th></tr></thead><tbody>` + OC.results.map(r => {
+    const refusedStep = r.detail.startsWith('refused');
+    const m = !r.ok ? '<span class="mark no">!</span>' : refusedStep ? '<span class="mark no" title="Refused, as intended">✕</span>' : '<span class="mark ok">✓</span>';
+    return `<tr><td>${m}</td><td>${esc(r.step)}</td><td class="${refusedStep ? 'mono small' : 'small'}">${esc(r.detail.replace('refused on-chain → ', 'Refused: '))}</td></tr>`;
+  }).join('') + '</tbody>';
+  $('oc-head').textContent = OC.auditHead;
+  $('foot-meta').textContent = `Simulation generated ${new Date(S.generatedAt).toUTCString()} · on-chain run at chain time ${new Date(OC.chainTime * 1000).toUTCString()}.`;
+})();
+</script>

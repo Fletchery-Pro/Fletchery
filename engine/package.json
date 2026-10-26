@@ -1,0 +1,22 @@
+{
+  "name": "fletchery-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fletchery off-chain engine: cap-aware router, Weekend Guard fair value, agent mandates, compliance reports, tamper-evident audit log, broker API.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "demo": "node scripts/simulate.ts",
+    "dashboard": "node --no-warnings scripts/build-dashboard.ts",
+    "serve": "node src/server.ts",
+    "e2e": "bash ../scripts/e2e.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0"
+  }
+}

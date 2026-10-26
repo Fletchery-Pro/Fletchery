@@ -1,0 +1,1013 @@
+<title>Fletchery Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a broker's operations console. Summary strip → live router → safety chart → caps → proof.
+   Cool "settlement paper" neutrals, slate ink, one indigo accent; venue colors only inside charts. */
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --ink: #141a22;
+  --ink-2: #4a5462;
+  --ink-3: #7a8494;
+  --rule: #dfe4ea;
+  --rule-strong: #c6cdd6;
+  --accent: #3446c9;
+  --accent-soft: #e6e9fb;
+  --band: #e9ecf2;
+  --closed: #eef0f4;
+  --good: #0a7d0a; --good-bg: #e3f3e3;
+  --warn: #9a6400; --warn-bg: #fdf1d8;
+  --bad: #c03030; --bad-bg: #fbe5e5;
+  --v1: #2a78d6; --v2: #eb6834; --v3: #1baf7a; --v4: #eda100; --v5: #e87ba4;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1318; --panel: #171c23; --ink: #e9edf2; --ink-2: #aab3c0; --ink-3: #7d8796;
+    --rule: #262d37; --rule-strong: #343d49; --accent: #8c9bff; --accent-soft: #232a4d;
+    --band: #222833; --closed: #1b2028;
+    --good: #5cc75c; --good-bg: #16301a; --warn: #f0b444; --warn-bg: #33280f; --bad: #f07575; --bad-bg: #3a1b1d;
+    --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1318; --panel: #171c23; --ink: #e9edf2; --ink-2: #aab3c0; --ink-3: #7d8796;
+  --rule: #262d37; --rule-strong: #343d49; --accent: #8c9bff; --accent-soft: #232a4d;
+  --band: #222833; --closed: #1b2028;
+  --good: #5cc75c; --good-bg: #16301a; --warn: #f0b444; --warn-bg: #33280f; --bad: #f07575; --bad-bg: #3a1b1d;
+  --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 30px; font-weight: 700; }
+h2 { font-size: 19px; font-weight: 700; }
+p { margin: 0; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+.small { font-size: 12.5px; }
+.eyebrow { font: 500 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; border-bottom: 1px solid var(--rule-strong); padding-bottom: 18px; }
+header.top .lede { max-width: 68ch; color: var(--ink-2); margin-top: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1 var(--font-mono); padding: 6px 9px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.kpi { background: var(--panel); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+@media (max-width: 700px) { .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.kpi .v { font: 500 24px/1.1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12.5px; color: var(--ink-2); }
+
+section.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
+.panel-head p { max-width: 70ch; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* router form */
+form.order { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: end; }
+label.f { display: grid; gap: 5px; font-size: 12px; color: var(--ink-2); }
+select, input[type=number] { font: 500 14px var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule-strong); border-radius: 7px; padding: 8px 10px; width: 100%; }
+select:focus-visible, input:focus-visible, button:focus-visible, .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; grid-column: 1 / -1; }
+.toggles label { display: inline-flex; gap: 7px; align-items: center; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.toggles input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.alloc { display: flex; height: 30px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--panel); }
+.alloc div { min-width: 2px; }
+.alloc-empty { height: 30px; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--band) 0 6px, transparent 6px 12px); border: 1px dashed var(--rule-strong); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.sw.line { height: 3px; width: 14px; border-radius: 2px; }
+
+.result { display: grid; gap: 14px; }
+.headline { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline; }
+.headline .big { font: 500 22px var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font: 500 11px/1.2 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td.r, th.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font: 500 11.5px/1 var(--font-mono); padding: 4px 7px; border-radius: 5px; white-space: nowrap; }
+.chip.ok { background: var(--good-bg); color: var(--good); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+
+.seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 12.5px var(--font-mono); background: transparent; color: var(--ink-2); border: 0; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule-strong); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+
+/* chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px var(--font-mono); fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--rule-strong); border-radius: 8px; padding: 9px 11px; font-size: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); min-width: 190px; display: grid; gap: 3px; z-index: 2; }
+.tip[hidden] { display: none; }
+.tip .row { display: flex; justify-content: space-between; gap: 14px; }
+.tip .row span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* caps */
+.caps { display: grid; gap: 10px; }
+.cap-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 120px; gap: 12px; align-items: center; }
+.cap-bar { height: 12px; background: var(--band); border-radius: 4px; overflow: hidden; }
+.cap-bar div { height: 100%; border-radius: 4px; }
+@media (max-width: 560px) { .cap-row { grid-template-columns: minmax(0, 1fr) auto; } .cap-row .cap-bar { grid-column: 1 / -1; grid-row: 2; } }
+
+/* timeline */
+ol.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+ol.timeline li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--rule); }
+ol.timeline li:first-child { border-top: 0; }
+ol.timeline .when { font: 12px/1.4 var(--font-mono); color: var(--ink-3); }
+ol.timeline .what { display: grid; gap: 3px; min-width: 0; }
+ol.timeline .what b { font-weight: 600; }
+@media (max-width: 560px) { ol.timeline li { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+.steps td:first-child { width: 28px; }
+.mark { font: 600 13px var(--font-mono); }
+.mark.ok { color: var(--good); }
+.mark.no { color: var(--bad); }
+.hash { font: 12px var(--font-mono); word-break: break-all; color: var(--ink-2); }
+footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--rule); padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { .alloc div, .cap-bar div { transition: flex-grow .35s ease, width .35s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Fletchery · broker gateway to SEC tokenized-stock venues</div>
+      <h1>Fletchery Console</h1>
+      <p class="lede">One integration that lets a broker route its customers' tokenized-stock orders across every compliant venue, with venue caps, halts, fair-value bands, AI-agent limits and an audit trail enforced on each fill.</p>
+    </div>
+    <span class="badge" title="All prices, depths, caps and flows are illustrative">● Simulated week · 26 Oct – 2 Nov 2026</span>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="panel" aria-labelledby="router-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="router-h">Route an order</h2>
+        <p class="muted small">This runs the real Fletchery routing engine in your browser. Change the order and watch which venues it uses, which it skips, and why.</p>
+      </div>
+      <button type="button" id="reset" class="seg" style="padding:7px 12px;font:500 12.5px var(--font-mono);background:transparent;color:var(--ink-2);cursor:pointer">Reset venues</button>
+    </div>
+    <form class="order" id="order" onsubmit="return false">
+      <label class="f" for="f-sym">Stock
+        <select id="f-sym"><option>AAPL</option><option>NVDA</option><option>TSLA</option><option>AMC</option></select>
+      </label>
+      <label class="f" for="f-side">Side
+        <select id="f-side"><option value="BUY">Buy</option><option value="SELL">Sell</option></select>
+      </label>
+      <label class="f" for="f-sh">Shares
+        <input id="f-sh" type="number" min="1" step="1" value="4000">
+      </label>
+      <label class="f" for="f-cl">Customer
+        <select id="f-cl"><option value="840">United States</option><option value="826">United Kingdom</option><option value="408">North Korea (sanctioned)</option></select>
+      </label>
+      <label class="f" for="f-when">When
+        <select id="f-when">
+          <option value="2026-10-26T10:30:00-04:00">Mon 10:30 · regular hours</option>
+          <option value="2026-10-26T22:00:00-04:00">Mon 22:00 · overnight</option>
+          <option value="2026-10-31T12:00:00-04:00" selected>Sat 12:00 · market closed</option>
+        </select>
+      </label>
+      <label class="f" for="f-del">Delivery
+        <select id="f-del"><option value="TOKEN">Token to wallet</option><option value="ANY">Brokerage position</option></select>
+      </label>
+      <div class="toggles">
+        <label for="t-wl"><input type="checkbox" id="t-wl"> Venue B has whitelisted the Fletchery router</label>
+        <label for="t-halt"><input type="checkbox" id="t-halt"> Exchange has halted this stock</label>
+        <label for="t-cap"><input type="checkbox" id="t-cap"> Late in the month (caps 95% used)</label>
+      </div>
+    </form>
+    <div class="result" id="result" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="guard-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="guard-h">Weekend Guard: fair value and allowed band</h2>
+        <p class="muted small">The dark line is Fletchery's fair value; the shaded band is the price range a venue pool may trade in. Shaded columns mark hours the stock exchange is shut. Hover for exact values.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Stock" id="sym-seg"></div>
+    </div>
+    <div class="legend" id="guard-legend"></div>
+    <div class="chart" id="guard-chart"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="caps-h">
+      <div class="panel-head">
+        <div>
+          <h2 id="caps-h">Monthly volume caps</h2>
+          <p class="muted small">SEC Tier 1 venues may trade at most 0.25% of last month's average daily volume per stock. Fletchery rejects any fill that would cross it.</p>
+        </div>
+      </div>
+      <div class="caps" id="caps"></div>
+    </section>
+    <section class="panel" aria-labelledby="bx-h">
+      <div class="panel-head">
+        <div>
+          <h2 id="bx-h">Where the week's orders went</h2>
+          <p class="muted small">Share of filled dollar volume by venue, and the dollar-weighted average fill against fair value (positive means the customer paid more than fair value).</p>
+        </div>
+      </div>
+      <div class="alloc" id="share-bar" role="img" aria-label="Share of volume by venue"></div>
+      <div class="tbl-wrap"><table id="bx"></table></div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Why venues were skipped</div>
+        <div class="tbl-wrap"><table id="reasons"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="tl-h">What happened this week</h2>
+        <p class="muted small">Scripted moments in the simulation, each handled by a different Fletchery module.</p>
+      </div>
+    </div>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <section class="panel" aria-labelledby="oc-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="oc-h">Proof on a real chain</h2>
+        <p class="muted small">The same rules running as smart contracts on a local Ethereum chain with Uniswap v4's own pool code. Each refusal below came back from the chain itself.</p>
+      </div>
+      <span class="chip info" id="oc-score"></span>
+    </div>
+    <div class="tbl-wrap"><table class="steps" id="steps"></table></div>
+    <p class="small muted">Audit log head anchored on-chain: <span class="hash" id="oc-head"></span></p>
+  </section>
+
+  <footer>
+    <p>All market data on this page is simulated. Venue names are generic placeholders; prices, depths, caps and flows are illustrative and say nothing about those venues' real activity.</p>
+    <p id="foot-meta"></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+
+// ── market/session.ts ──
+// US equity market sessions in New York time, matching FairValueOracle.Session on-chain.
+//   REGULAR    09:30–16:00 ET on trading days
+//   EXTENDED   04:00–09:30 and 16:00–20:00 ET on trading days
+//   OVERNIGHT  20:00–04:00 ET between two trading days (as offered by 24-hour brokers: Sun 8pm – Fri 8pm)
+//   CLOSED     weekends and exchange holidays
+// Holiday list: NYSE published calendar. Verify yearly before production use.
+
+const Session = { CLOSED: 0, OVERNIGHT: 1, EXTENDED: 2, REGULAR: 3 }         ;
+                                                             
+const SESSION_NAME                          = {
+  0: 'CLOSED',
+  1: 'OVERNIGHT',
+  2: 'EXTENDED',
+  3: 'REGULAR',
+};
+
+const NYSE_HOLIDAYS = new Set([
+  // 2026
+  '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25',
+  '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
+  // 2027
+  '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31',
+  '2027-06-18', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-24',
+]);
+/** 13:00 ET early closes */
+const NYSE_EARLY_CLOSE = new Set(['2026-11-27', '2026-12-24', '2027-11-26']);
+
+const fmt = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  weekday: 'short',
+  hourCycle: 'h23',
+});
+
+                         
+                                         
+                                
+                                                     
+ 
+
+const WD                         = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+function nyTime(tsMs        )         {
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(tsMs)).map((p) => [p.type, p.value]));
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    weekday: WD[parts.weekday],
+    minutes: Number(parts.hour) * 60 + Number(parts.minute),
+  };
+}
+
+function isTradingDay(date        )          {
+  const wd = new Date(date + 'T12:00:00Z').getUTCDay();
+  return wd !== 0 && wd !== 6 && !NYSE_HOLIDAYS.has(date);
+}
+
+function addDays(date        , n        )         {
+  const d = new Date(date + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function sessionAt(tsMs        )          {
+  const t = nyTime(tsMs);
+  const today = isTradingDay(t.date);
+  const close = NYSE_EARLY_CLOSE.has(t.date) ? 13 * 60 : 16 * 60;
+  if (today) {
+    if (t.minutes >= 9 * 60 + 30 && t.minutes < close) return Session.REGULAR;
+    if (t.minutes >= 4 * 60 && t.minutes < 9 * 60 + 30) return Session.EXTENDED;
+    if (t.minutes >= close && t.minutes < 20 * 60) return Session.EXTENDED;
+    // before 04:00 on a trading day: the overnight session opened at 20:00 the evening before
+    if (t.minutes < 4 * 60) return Session.OVERNIGHT;
+    // after 20:00: overnight only if tomorrow trades
+    return isTradingDay(addDays(t.date, 1)) ? Session.OVERNIGHT : Session.CLOSED;
+  }
+  // Non-trading day: Sunday (or holiday) evening opens the overnight session before a trading day.
+  if (t.minutes >= 20 * 60 && isTradingDay(addDays(t.date, 1))) return Session.OVERNIGHT;
+  return Session.CLOSED;
+}
+
+/** Hours since the most recent regular-session close, used to widen fair-value confidence. */
+function hoursSinceLastClose(tsMs        )         {
+  let probe = tsMs;
+  for (let i = 0; i < 24 * 12; i++) {
+    const t = nyTime(probe);
+    const close = NYSE_EARLY_CLOSE.has(t.date) ? 13 * 60 : 16 * 60;
+    if (isTradingDay(t.date) && t.minutes >= close) {
+      const minutesAfterClose = t.minutes - close;
+      return (tsMs - probe) / 3_600_000 + minutesAfterClose / 60;
+    }
+    if (sessionAt(probe) === Session.REGULAR) return 0;
+    probe -= 3_600_000;
+  }
+  return 24 * 12;
+}
+
+// ── safety/fairValue.ts ──
+// Weekend Guard: a 24/7 fair value for each tokenized stock.
+//
+// When the primary market is open, fair value is the NBBO mid. When it is shut, the engine
+// starts from the last close and moves it by things that do still trade:
+//   - index futures (Sun 18:00 – Fri 17:00 ET), scaled by the stock's beta
+//   - prices on offshore / other tokenized venues, weighted by depth, with outliers rejected
+// Confidence widens with time since the close (volatility × √time), and a thin or manipulated
+// offshore print cannot drag the estimate far because each observation's weight is capped.
+
+
+/** Mirrors FairValueOracle's on-chain defaults: [baseBps, maxStalenessSeconds]. */
+const BAND_POLICY                                                             = {
+  [Session.REGULAR]: { baseBps: 300, maxStaleness: 120 },
+  [Session.EXTENDED]: { baseBps: 500, maxStaleness: 300 },
+  [Session.OVERNIGHT]: { baseBps: 700, maxStaleness: 600 },
+  [Session.CLOSED]: { baseBps: 1000, maxStaleness: 1800 },
+};
+
+const median = (xs          )         => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+function computeFairValue(ref               , tsMs        )            {
+  const session = sessionAt(tsMs);
+  const rejected                                      = [];
+
+  // 1. Model anchor
+  let model        ;
+  let modelSigma        ; // as a fraction of price
+  if ((session === Session.REGULAR || session === Session.EXTENDED) && ref.nbboMid) {
+    model = ref.nbboMid;
+    modelSigma = session === Session.REGULAR ? 0.0005 : 0.002;
+  } else {
+    const hours = hoursSinceLastClose(tsMs);
+    // calendar-time scaling; conservative, since weekend hours count as fully as weekday hours
+    const effTradingYears = Math.max(hours, 0.25) / (24 * 365);
+    const futMove = ref.futuresReturnSinceClose ?? 0;
+    model = ref.lastClose * (1 + ref.beta * futMove);
+    const idio = ref.annualVol * Math.sqrt(effTradingYears);
+    modelSigma = ref.futuresReturnSinceClose === undefined ? idio * 1.25 : idio;
+  }
+
+  // 2. Observations: reject stale outliers (> 4 MADs or > 15% from model)
+  const obs = ref.observations.filter((o) => o.price > 0 && o.depthUsd > 0);
+  const med = obs.length ? median(obs.map((o) => o.price)) : model;
+  const mad = obs.length ? median(obs.map((o) => Math.abs(o.price - med))) || med * 0.002 : 0;
+  const used                     = [];
+  for (const o of obs) {
+    if (Math.abs(o.price - med) > 4 * mad && obs.length >= 3) {
+      rejected.push({ venue: o.venue, reason: 'outlier vs other venues' });
+    } else if (Math.abs(o.price / model - 1) > 0.15) {
+      rejected.push({ venue: o.venue, reason: '>15% from model' });
+    } else if (o.depthUsd < 25_000) {
+      rejected.push({ venue: o.venue, reason: 'too thin (<$25k depth)' });
+    } else {
+      used.push(o);
+    }
+  }
+
+  // 3. Precision-weighted blend. Each venue's precision grows with depth but is capped so no
+  //    single venue can carry more than 40% of the total weight.
+  const modelPrec = 1 / (modelSigma * modelSigma);
+  let weights = used.map((o) => {
+    const sigma = 0.004 * Math.sqrt(1_000_000 / o.depthUsd); // ±0.4% at $1m depth
+    return 1 / (sigma * sigma);
+  });
+  const totalObs = weights.reduce((a, b) => a + b, 0);
+  const cap = 0.4 * (modelPrec + totalObs);
+  weights = weights.map((w) => Math.min(w, cap));
+  const totalW = modelPrec + weights.reduce((a, b) => a + b, 0);
+  const price = (model * modelPrec + used.reduce((a, o, i) => a + o.price * weights[i], 0)) / totalW;
+  const sigma = Math.sqrt(1 / totalW);
+  const confidenceBps = Math.min(5000, Math.max(1, Math.round(sigma * 1.96 * 10_000)));
+
+  const width = BAND_POLICY[session].baseBps + confidenceBps;
+  return {
+    symbol: ref.symbol,
+    price,
+    confidenceBps,
+    session,
+    model,
+    usedObservations: used.map((o) => o.venue),
+    rejectedObservations: rejected,
+    lowBand: price * (1 - width / 10_000),
+    highBand: price * (1 + width / 10_000),
+  };
+}
+
+function inBand(fv           , price        )          {
+  return price >= fv.lowBand && price <= fv.highBand;
+}
+
+// ── execution/venues.ts ──
+// Venue models for routing. Each venue is a constant-product pool per symbol (a fair stand-in
+// for a full-range AMM) or, for the primary market, a deep book with a spread.
+// The default landscape mirrors the real October 2026 market structure, with SIMULATED numbers.
+
+
+const US = 840;
+const SANCTIONED = [408, 364, 760, 192]; // KP, IR, SY, CU
+
+function poolPrice(p      )         {
+  return p.cash / p.stock;
+}
+
+/** Shares out for a cash-in buy, and the post-trade price (constant product, fee on input). */
+function quoteBuy(p      , cashIn        , feeBps        )                                   {
+  const eff = cashIn * (1 - feeBps / 10_000);
+  const k = p.stock * p.cash;
+  const newCash = p.cash + eff;
+  const newStock = k / newCash;
+  return { shares: p.stock - newStock, post: newCash / newStock };
+}
+
+/** Cash in needed to receive `shares`. */
+function costToBuy(p      , shares        , feeBps        )                                 {
+  if (shares >= p.stock) return { cash: Infinity, post: Infinity };
+  const k = p.stock * p.cash;
+  const newStock = p.stock - shares;
+  const newCash = k / newStock;
+  return { cash: (newCash - p.cash) / (1 - feeBps / 10_000), post: newCash / newStock };
+}
+
+/** Cash out for selling `shares`. */
+function proceedsToSell(p      , shares        , feeBps        )                                 {
+  const eff = shares * (1 - feeBps / 10_000);
+  const k = p.stock * p.cash;
+  const newStock = p.stock + eff;
+  const newCash = k / newStock;
+  return { cash: p.cash - newCash, post: newCash / newStock };
+}
+
+function pool(price        , depthUsd        )       {
+  // Constant-product pool with `depthUsd` of *virtual* reserves on each side. Real TSV pools use
+  // concentrated liquidity (Uniswap v4), which behaves like a much larger x·y=k pool near the price.
+  return { stock: depthUsd / price, cash: depthUsd };
+}
+
+const ALL            = [Session.CLOSED, Session.OVERNIGHT, Session.EXTENDED, Session.REGULAR];
+
+                                   
+                                                                          
+                               
+                                                                            
+                                   
+ 
+
+/**
+ * Simulated venue landscape. Venue names are generic and every number is illustrative:
+ *  - Venue A: a TSV running the Fletchery hook (US persons, Tier 1)
+ *  - Venue B: an independent TSV that only accepts routers it has approved (whitelist)
+ *  - Venue C: a smaller TSV on a different chain
+ *  - Offshore pool: stock tokens issued outside the US (non-US customers only)
+ *  - Primary market via the broker's existing route (regular + extended hours only)
+ */
+function defaultVenues(prices                        , opts                   = {})          {
+  const syms = Object.keys(prices);
+  const mk = (depthUsd        )                       =>
+    Object.fromEntries(syms.map((s) => [s, pool(prices[s], depthUsd)]));
+  const caps = (fallbackShares        , share        )                         =>
+    Object.fromEntries(
+      syms.map((s) => {
+        const cap = opts.adv?.[s] !== undefined ? opts.adv[s] * 0.0025 * share : fallbackShares;
+        return [s, cap * (1 - (opts.capUsed?.[s] ?? 0))];
+      }),
+    );
+  const unlimited = Object.fromEntries(syms.map((s) => [s, Number.POSITIVE_INFINITY]));
+  return [
+    {
+      id: 'venue-a',
+      name: 'Venue A',
+      operator: 'Fletchery hook (simulated)',
+      chain: 'Chain A',
+      kind: 'TSV',
+      allowJurisdictions: [US],
+      sessions: ALL,
+      feeBps: 10,
+      gasUsd: 0.02,
+      requiresWhitelist: false,
+      fletcheryWhitelisted: true,
+      mevProtected: true,
+      capTier: 1,
+      capRemaining: caps(9_000, 1),
+      halted: new Set(),
+      pools: mk(80_000_000),
+    },
+    {
+      id: 'venue-b',
+      name: 'Venue B',
+      operator: 'Independent TSV (simulated)',
+      chain: 'Chain B',
+      kind: 'TSV',
+      allowJurisdictions: [US],
+      sessions: ALL,
+      feeBps: 15,
+      gasUsd: 0.01,
+      requiresWhitelist: true,
+      fletcheryWhitelisted: false, // flips to true once Venue B approves the Fletchery router
+      mevProtected: false,
+      capTier: 1,
+      capRemaining: caps(12_000, 1.2),
+      halted: new Set(),
+      pools: mk(120_000_000),
+    },
+    {
+      id: 'venue-c',
+      name: 'Venue C',
+      operator: 'Independent TSV (simulated)',
+      chain: 'Chain C',
+      kind: 'TSV',
+      allowJurisdictions: [US],
+      sessions: ALL,
+      feeBps: 12,
+      gasUsd: 0.05,
+      requiresWhitelist: false,
+      fletcheryWhitelisted: true,
+      mevProtected: true,
+      capTier: 1,
+      capRemaining: caps(5_000, 0.6),
+      halted: new Set(),
+      pools: mk(50_000_000),
+    },
+    {
+      id: 'offshore',
+      name: 'Offshore pool',
+      operator: 'Non-US token issuer (simulated)',
+      chain: 'Chain A',
+      kind: 'OFFSHORE',
+      blockJurisdictions: [US, ...SANCTIONED],
+      sessions: ALL,
+      feeBps: 8,
+      gasUsd: 0.02,
+      requiresWhitelist: false,
+      fletcheryWhitelisted: true,
+      mevProtected: false,
+      capRemaining: { ...unlimited },
+      halted: new Set(),
+      pools: mk(160_000_000),
+    },
+    {
+      id: 'primary',
+      name: 'Primary market (broker route)',
+      operator: 'NMS exchanges via broker',
+      chain: 'off-chain',
+      kind: 'PRIMARY',
+      blockJurisdictions: SANCTIONED,
+      sessions: [Session.REGULAR, Session.EXTENDED],
+      feeBps: 0,
+      gasUsd: 0,
+      requiresWhitelist: false,
+      fletcheryWhitelisted: true,
+      mevProtected: true,
+      capRemaining: { ...unlimited },
+      halted: new Set(),
+      pools: mk(20_000_000_000),
+      spreadBps: 2,
+    },
+  ];
+}
+
+// ── execution/router.ts ──
+// Cap-aware smart order router (Fletchery · Execution module).
+//
+// The problem: from Sept 2026 a US broker can reach several SEC Tokenized Securities Venues plus
+// the primary market and (for non-US clients) offshore stock-token pools. Each TSV has a hard
+// monthly volume cap (0.25% / 2.5% of prior-month ADV), its own whitelist, halts and a
+// fair-value band. No single venue can absorb size, and routing blindly risks rejected orders.
+//
+// The router filters venues by eligibility, then fills the order in slices, each slice going to
+// the venue with the best marginal all-in price (fees, half-spread, gas on first use), never
+// exceeding a venue's cap headroom, the fair-value band or the client's limit price.
+
+
+
+const SLICES = 200;
+
+function eligibility(v       , o       , fv           )                {
+  const s = sessionAt(o.tsMs);
+  if (!v.pools[o.symbol]) return 'symbol not listed';
+  if (o.delivery === 'TOKEN' && v.kind === 'PRIMARY') return 'token delivery requested (on-chain only)';
+  if (v.halted.has(o.symbol)) return 'symbol halted';
+  if (!v.sessions.includes(s)) return 'venue closed this session';
+  if (v.allowJurisdictions && !v.allowJurisdictions.includes(o.jurisdiction)) return 'jurisdiction not eligible';
+  if (v.blockJurisdictions?.includes(o.jurisdiction)) return 'jurisdiction blocked';
+  if (v.requiresWhitelist && !v.fletcheryWhitelisted) return 'router not whitelisted by venue';
+  if ((v.capRemaining[o.symbol] ?? 0) <= 0) return 'monthly volume cap exhausted';
+  const px = poolPrice(v.pools[o.symbol]);
+  if (v.kind !== 'PRIMARY' && (px < fv.lowBand || px > fv.highBand)) {
+    // still eligible if trading would move it toward fair value
+    const helps = (o.side === 'BUY' && px < fv.lowBand) || (o.side === 'SELL' && px > fv.highBand);
+    if (!helps) return 'pool price outside fair-value band';
+  }
+  return null;
+}
+
+function legCost(v       , symbol        , side      , shares        )                                 {
+  const fee = v.feeBps + (v.spreadBps ?? 0) / 2;
+  const p = v.pools[symbol];
+  return side === 'BUY' ? costToBuy(p, shares, fee) : proceedsToSell(p, shares, fee);
+}
+
+function bandOk(v       , side      , post        , fv           , pre        )          {
+  if (v.kind === 'PRIMARY') return true;
+  const outside = (x        ) => (x < fv.lowBand ? fv.lowBand - x : x > fv.highBand ? x - fv.highBand : 0);
+  const dPost = outside(post);
+  return dPost === 0 || dPost < outside(pre); // same rule as FletcheryHook
+}
+
+function greedyFill(order       , eligible         , fv           )                      {
+  const sign = order.side === 'BUY' ? 1 : -1; // buy: minimise cash; sell: maximise cash
+  const alloc = new Map                (eligible.map((v) => [v.id, 0]));
+  const slice = order.shares / SLICES;
+  let left = order.shares;
+  while (left > 1e-9) {
+    let best                                                      = null;
+    for (const v of eligible) {
+      const cur = alloc.get(v.id) ;
+      const capLeft = (v.capRemaining[order.symbol] ?? 0) - cur;
+      const pre = poolPrice(v.pools[order.symbol]);
+      const before = cur === 0 ? { cash: 0, post: pre } : legCost(v, order.symbol, order.side, cur);
+      // full slice, or the largest smaller piece that fits the cap and the band
+      for (const frac of [1, 0.5, 0.25, 0.1]) {
+        const take = Math.min(slice * frac, capLeft, left);
+        if (take <= order.shares * 1e-6) break;
+        const after = legCost(v, order.symbol, order.side, cur + take);
+        if (!Number.isFinite(after.cash)) continue;
+        if (!bandOk(v, order.side, after.post, fv, pre)) continue;
+        const marginalPx = (after.cash - before.cash) / take;
+        if (order.limitPrice !== undefined && sign * (marginalPx - order.limitPrice) > 0) continue;
+        const marginal = sign * marginalPx;
+        if (!best || marginal < best.marginal) best = { v, marginal, take };
+        break;
+      }
+    }
+    if (!best) break;
+    alloc.set(best.v.id, alloc.get(best.v.id)  + best.take);
+    left -= best.take;
+  }
+  return alloc;
+}
+
+function route(order       , venues         , fv           )            {
+  const sign = order.side === 'BUY' ? 1 : -1;
+  const rejected              = [];
+  const eligible          = [];
+  for (const v of venues) {
+    const why = eligibility(v, order, fv);
+    if (why) rejected.push({ venueId: v.id, reason: why });
+    else eligible.push(v);
+  }
+
+  // Try every subset of eligible venues (at most 2^5) and keep the plan that fills the most,
+  // then costs the least all-in. This stops tiny orders being split where gas outweighs savings.
+  let best                                                                      = null;
+  const nSub = 1 << eligible.length;
+  for (let mask = 1; mask < nSub; mask++) {
+    const subset = eligible.filter((_, i) => mask & (1 << i));
+    const alloc = greedyFill(order, subset, fv);
+    let filled = 0;
+    let cost = 0;
+    for (const v of subset) {
+      const sh = alloc.get(v.id) ;
+      if (sh <= 0) continue;
+      filled += sh;
+      cost += legCost(v, order.symbol, order.side, sh).cash * sign + v.gasUsd;
+    }
+    if (
+      !best ||
+      filled > best.filled + 1e-9 ||
+      (Math.abs(filled - best.filled) <= 1e-9 && cost < best.cost - 1e-9)
+    ) {
+      best = { alloc, filled, cost };
+    }
+  }
+  const alloc = best?.alloc ?? new Map                ();
+
+  const legs        = [];
+  for (const v of eligible) {
+    const sh = alloc.get(v.id) ?? 0;
+    if (sh <= 0) {
+      rejected.push({ venueId: v.id, reason: 'eligible but not competitive / capacity' });
+      continue;
+    }
+    const c = legCost(v, order.symbol, order.side, sh);
+    legs.push({ venueId: v.id, shares: sh, cash: c.cash, avgPrice: c.cash / sh, postPrice: c.post });
+  }
+  const filled = legs.reduce((a, l) => a + l.shares, 0);
+  const totalCash = legs.reduce((a, l) => a + l.cash, 0) + legs.reduce((a, l) => a + (venues.find((v) => v.id === l.venueId) .gasUsd), 0) * sign;
+  const avgPrice = filled ? totalCash / filled : 0;
+
+  // Baseline: the best any single eligible venue could have done alone (respecting its cap)
+  let bestSingle                              ;
+  for (const v of eligible) {
+    const cap = Math.min(order.shares, v.capRemaining[order.symbol] ?? 0);
+    let sh = cap;
+    // shrink until band and limit allow
+    for (let k = 0; k < 40 && sh > 0; k++) {
+      const c = legCost(v, order.symbol, order.side, sh);
+      const ok =
+        Number.isFinite(c.cash) &&
+        bandOk(v, order.side, c.post, fv, poolPrice(v.pools[order.symbol])) &&
+        (order.limitPrice === undefined || sign * (c.cash / sh - order.limitPrice) <= 0);
+      if (ok) break;
+      sh *= 0.85;
+    }
+    if (sh <= 0) continue;
+    const c = legCost(v, order.symbol, order.side, sh);
+    const ap = (c.cash + sign * v.gasUsd) / sh;
+    if (!bestSingle || sh > bestSingle.filled + 1e-9 || (Math.abs(sh - bestSingle.filled) < 1e-9 && sign * ap < sign * bestSingle.avgPrice)) {
+      bestSingle = { venueId: v.id, avgPrice: ap, filled: sh };
+    }
+  }
+
+  const slippage = filled ? (sign * (avgPrice - fv.price) / fv.price) * 10_000 : 0;
+  const plan            = {
+    orderId: order.id,
+    symbol: order.symbol,
+    side: order.side,
+    requested: order.shares,
+    filled,
+    unfilled: Math.max(0, order.shares - filled),
+    legs,
+    avgPrice,
+    totalCash,
+    fairValue: fv.price,
+    slippageVsFairBps: slippage,
+    rejected,
+    session: sessionAt(order.tsMs),
+    bestSingleVenue: bestSingle,
+  };
+  if (bestSingle && filled && Math.abs(bestSingle.filled - filled) < 1e-6) {
+    plan.improvementVsSingleBps = (sign * (bestSingle.avgPrice - avgPrice) / bestSingle.avgPrice) * 10_000;
+  }
+  return plan;
+}
+
+/** Apply a plan to venue state (simulation): move pool reserves and consume cap headroom. */
+function execute(plan           , venues         )       {
+  for (const leg of plan.legs) {
+    const v = venues.find((x) => x.id === leg.venueId) ;
+    const p = v.pools[plan.symbol];
+    const fee = v.feeBps + (v.spreadBps ?? 0) / 2;
+    if (plan.side === 'BUY') {
+      p.cash += leg.cash * (1 - fee / 10_000);
+      p.stock -= leg.shares;
+    } else {
+      p.stock += leg.shares * (1 - fee / 10_000);
+      p.cash -= leg.cash;
+    }
+    if (v.kind === 'PRIMARY') {
+      // the primary market re-centres on fair value; it is not a captive pool
+      const k = p.stock * p.cash;
+      p.cash = Math.sqrt(k * plan.fairValue);
+      p.stock = k / p.cash;
+    }
+    v.capRemaining[plan.symbol] -= leg.shares;
+  }
+}
+
+window.FletcheryEngine = { Session, SESSION_NAME, sessionAt, computeFairValue, defaultVenues, poolPrice, route, execute };
+})();
+</script>
+<script>
+const DATA = {"scenario":{"generatedAt":"2026-10-26T13:57:25.377Z","disclaimer":"Simulated data. Venue names reflect public filings; all prices, depths, caps and flows are illustrative.","window":{"start":1793001600000,"end":1793631600000},"venues":[{"id":"venue-a","name":"Venue A","operator":"Fletchery hook (simulated)","chain":"Chain A","kind":"TSV","tier":1,"feeBps":10,"mevProtected":true,"whitelisted":true},{"id":"venue-b","name":"Venue B","operator":"Independent TSV (simulated)","chain":"Chain B","kind":"TSV","tier":1,"feeBps":15,"mevProtected":false,"whitelisted":true},{"id":"venue-c","name":"Venue C","operator":"Independent TSV (simulated)","chain":"Chain C","kind":"TSV","tier":1,"feeBps":12,"mevProtected":true,"whitelisted":true},{"id":"offshore","name":"Offshore pool","operator":"Non-US token issuer (simulated)","chain":"Chain A","kind":"OFFSHORE","tier":null,"feeBps":8,"mevProtected":false,"whitelisted":true},{"id":"primary","name":"Primary market (broker route)","operator":"NMS exchanges via broker","chain":"off-chain","kind":"PRIMARY","tier":null,"feeBps":0,"mevProtected":true,"whitelisted":true}],"timeline":[{"ts":1793024100000,"kind":"route","title":"Token-delivery block split across venues","detail":"4,000 AAPL for wallet delivery: venue-a 2480, venue-c 1520. 49.6 bps better than the best single venue."},{"ts":1793026800000,"kind":"access","title":"Venue B whitelists the Fletchery router","detail":"Venue B only accepts routers it has approved. Once approved, Fletchery customers reach its liquidity with no new integration."},{"ts":1793026800000,"kind":"route","title":"Same block after Venue B joins","detail":"Now 3 venues: avg 261.47 vs fair value 259.97 (57.9 bps)."},{"ts":1793121300000,"kind":"halt","title":"TSLA limit-up/limit-down pause mirrored","detail":"Primary listing pauses TSLA. Fletchery sets the halt on every venue at once, so no pool keeps trading a stock the exchange has stopped."},{"ts":1793121300000,"kind":"reject","title":"Order during halt refused with a reason","detail":"no eligible venue: symbol halted; token delivery requested (on-chain only)"},{"ts":1793122200000,"kind":"halt","title":"TSLA resumes","detail":"Halt lifted everywhere at once."},{"ts":1793195100000,"kind":"agent","title":"Customer gives an AI agent a mandate","detail":"$5,000 per trade, $20,000 per day, buys only, AAPL and NVDA only, 7 days."},{"ts":1793210400000,"kind":"agent","title":"Agent order refused","detail":"DailyLimit: $20537.68 > $20000"},{"ts":1793211300000,"kind":"agent","title":"Agent tries an $8,000 order","detail":"PerTradeLimit: $7998.65 > $5000"},{"ts":1793211300000,"kind":"agent","title":"Agent tries a symbol outside its mandate","detail":"SymbolNotAllowed: TSLA"},{"ts":1793214000000,"kind":"agent","title":"Agent order refused","detail":"DailyLimit: $20225.08 > $20000"},{"ts":1793282400000,"kind":"cap","title":"NVDA meets late-month Tier 1 caps","detail":"Headroom before: venue-a 274, venue-b 1890, venue-c 945 shares. Order filled 3000 of 3,000 without breaching any venue cap."},{"ts":1793462400000,"kind":"guard","title":"Thin offshore AMC print spikes +40%","detail":"Weekend Guard rejects it (outlier vs other venues). Fair value stays 3.110; band 2.716–3.504."},{"ts":1793462400000,"kind":"guard","title":"Panic buy stopped at the band","detail":"A $1,243,767 market buy fills 57100 shares at avg 3.305, then stops: every pool reached the top of the fair-value band (3.504), so nobody pays the bad print's 4.35. The rest stays unfilled rather than chasing the price."},{"ts":1793574000000,"kind":"guard","title":"Futures reopen −1.8%","detail":"Fair values move by beta before Monday (NVDA 184.35, β 1.7); overnight band ±10.2%."}],"samples":{"AAPL":[{"ts":1793001600000,"fv":260.0803,"lo":246.6342,"hi":273.5265,"session":"EXTENDED","venues":{"venue-a":260.0325,"venue-b":260.0325,"venue-c":260.0325,"offshore":260.0325}},{"ts":1793005200000,"fv":259.5913,"lo":246.1704,"hi":273.0122,"session":"EXTENDED","venues":{"venue-a":259.7951,"venue-b":259.7951,"venue-c":259.7951,"offshore":259.7951}},{"ts":1793008800000,"fv":259.7625,"lo":246.2808,"hi":273.2441,"session":"EXTENDED","venues":{"venue-a":259.757,"venue-b":259.7697,"venue-c":259.7697,"offshore":259.7697}},{"ts":1793012400000,"fv":259.9285,"lo":246.4383,"hi":273.4188,"session":"EXTENDED","venues":{"venue-a":259.87,"venue-b":259.8703,"venue-c":259.8703,"offshore":259.8703}},{"ts":1793016000000,"fv":259.9894,"lo":246.548,"hi":273.4309,"session":"EXTENDED","venues":{"venue-a":260.0213,"venue-b":260.0264,"venue-c":260.0264,"offshore":260.0264}},{"ts":1793019600000,"fv":260.1375,"lo":246.6884,"hi":273.5866,"session":"EXTENDED","venues":{"venue-a":260.1401,"venue-b":260.1403,"venue-c":260.1403,"offshore":260.1403}},{"ts":1793023200000,"fv":259.7273,"lo":251.7017,"hi":267.7529,"session":"REGULAR","venues":{"venue-a":259.7552,"venue-b":259.7578,"venue-c":259.7578,"offshore":259.7578}},{"ts":1793026800000,"fv":260.2687,"lo":252.2264,"hi":268.311,"session":"REGULAR","venues":{"venue-a":262.2961,"venue-b":262.1827,"venue-c":262.2512,"offshore":259.9165}},{"ts":1793030400000,"fv":260.3024,"lo":252.2591,"hi":268.3458,"session":"REGULAR","venues":{"venue-a":260.1809,"venue-b":260.178,"venue-c":260.1797,"offshore":260.1234}},{"ts":1793034000000,"fv":259.4616,"lo":251.4442,"hi":267.479,"session":"REGULAR","venues":{"venue-a":259.7356,"venue-b":259.7356,"venue-c":259.7356,"offshore":259.7308}},{"ts":1793037600000,"fv":259.8429,"lo":251.8138,"hi":267.8721,"session":"REGULAR","venues":{"venue-a":259.7214,"venue-b":259.71,"venue-c":259.71,"offshore":259.7098}},{"ts":1793041200000,"fv":258.8662,"lo":250.8672,"hi":266.8652,"session":"REGULAR","venues":{"venue-a":259.098,"venue-b":259.1014,"venue-c":259.1014,"offshore":259.1071}},{"ts":1793044800000,"fv":259.3052,"lo":245.7954,"hi":272.815,"session":"EXTENDED","venues":{"venue-a":259.1879,"venue-b":259.188,"venue-c":259.188,"offshore":259.1875}},{"ts":1793048400000,"fv":259.13,"lo":245.6293,"hi":272.6307,"session":"EXTENDED","venues":{"venue-a":259.2156,"venue-b":259.2156,"venue-c":259.2156,"offshore":259.2157}},{"ts":1793052000000,"fv":259.4988,"lo":245.9789,"hi":273.0187,"session":"EXTENDED","venues":{"venue-a":259.3612,"venue-b":259.3612,"venue-c":259.3612,"offshore":259.365}},{"ts":1793055600000,"fv":260.1628,"lo":246.6603,"hi":273.6652,"session":"EXTENDED","venues":{"venue-a":259.9841,"venue-b":259.9793,"venue-c":259.9793,"offshore":259.9803}},{"ts":1793059200000,"fv":260.289,"lo":241.4961,"hi":279.0819,"session":"OVERNIGHT","venues":{"venue-a":260.3118,"venue-b":260.3248,"venue-c":260.3248,"offshore":260.3249}},{"ts":1793062800000,"fv":260.2244,"lo":241.4362,"hi":279.0127,"session":"OVERNIGHT","venues":{"venue-a":260.2546,"venue-b":260.2515,"venue-c":260.2515,"offshore":260.2515}},{"ts":1793066400000,"fv":260.173,"lo":241.3885,"hi":278.9575,"session":"OVERNIGHT","venues":{"venue-a":260.1773,"venue-b":260.1945,"venue-c":260.1945,"offshore":260.1945}},{"ts":1793070000000,"fv":260.1306,"lo":241.3492,"hi":278.912,"session":"OVERNIGHT","venues":{"venue-a":260.1479,"venue-b":260.1483,"venue-c":260.1483,"offshore":260.1483}},{"ts":1793073600000,"fv":260.0948,"lo":241.316,"hi":278.8737,"session":"OVERNIGHT","venues":{"venue-a":260.1097,"venue-b":260.1097,"venue-c":260.1097,"offshore":260.1097}},{"ts":1793077200000,"fv":260.064,"lo":241.2874,"hi":278.8406,"session":"OVERNIGHT","venues":{"venue-a":260.0756,"venue-b":260.0769,"venue-c":260.0769,"offshore":260.0769}},{"ts":1793080800000,"fv":260.0371,"lo":241.2624,"hi":278.8118,"session":"OVERNIGHT","venues":{"venue-a":260.037,"venue-b":260.0483,"venue-c":260.0483,"offshore":260.0483}},{"ts":1793084400000,"fv":260.0163,"lo":241.3211,"hi":278.7115,"session":"OVERNIGHT","venues":{"venue-a":260.0139,"venue-b":260.026,"venue-c":260.026,"offshore":260.026}},{"ts":1793088000000,"fv":260.2873,"lo":246.7784,"hi":273.7962,"session":"EXTENDED","venues":{"venue-a":260.1238,"venue-b":260.1241,"venue-c":260.1241,"offshore":260.1241}},{"ts":1793091600000,"fv":259.9752,"lo":246.4825,"hi":273.4679,"session":"EXTENDED","venues":{"venue-a":260.0086,"venue-b":260.0086,"venue-c":260.0086,"offshore":260.0086}},{"ts":1793095200000,"fv":260.216,"lo":246.7108,"hi":273.7212,"session":"EXTENDED","venues":{"venue-a":260.1101,"venue-b":260.1104,"venue-c":260.1104,"offshore":260.1104}},{"ts":1793098800000,"fv":260.4588,"lo":246.941,"hi":273.9766,"session":"EXTENDED","venues":{"venue-a":260.3701,"venue-b":260.3632,"venue-c":260.3632,"offshore":260.3632}},{"ts":1793102400000,"fv":260.9017,"lo":247.4131,"hi":274.3903,"session":"EXTENDED","venues":{"venue-a":260.7277,"venue-b":260.7293,"venue-c":260.7293,"offshore":260.7293}},{"ts":1793106000000,"fv":261.1708,"lo":247.6682,"hi":274.6733,"session":"EXTENDED","venues":{"venue-a":261.1103,"venue-b":261.1104,"venue-c":261.1104,"offshore":261.1104}},{"ts":1793109600000,"fv":261.3158,"lo":253.2411,"hi":269.3904,"session":"REGULAR","venues":{"venue-a":261.3962,"venue-b":261.3945,"venue-c":261.3945,"offshore":261.4008}},{"ts":1793113200000,"fv":261.9246,"lo":253.8312,"hi":270.0181,"session":"REGULAR","venues":{"venue-a":261.8836,"venue-b":261.8859,"venue-c":261.8859,"offshore":261.8861}},{"ts":1793116800000,"fv":261.7109,"lo":253.624,"hi":269.7978,"session":"REGULAR","venues":{"venue-a":261.8425,"venue-b":261.8371,"venue-c":261.8371,"offshore":261.8371}},{"ts":1793120400000,"fv":261.0587,"lo":252.992,"hi":269.1254,"session":"REGULAR","venues":{"venue-a":261.2265,"venue-b":261.2262,"venue-c":261.2262,"offshore":261.2176}},{"ts":1793124000000,"fv":261.8718,"lo":253.78,"hi":269.9637,"session":"REGULAR","venues":{"venue-a":261.8291,"venue-b":261.7974,"venue-c":261.7974,"offshore":261.7972}},{"ts":1793127600000,"fv":261.9263,"lo":253.8328,"hi":270.0199,"session":"REGULAR","venues":{"venue-a":262.0753,"venue-b":262.0727,"venue-c":262.0727,"offshore":262.0727}},{"ts":1793131200000,"fv":261.1822,"lo":247.6268,"hi":274.7375,"session":"EXTENDED","venues":{"venue-a":261.3302,"venue-b":261.3156,"venue-c":261.3156,"offshore":261.3174}},{"ts":1793134800000,"fv":261.246,"lo":247.6874,"hi":274.8047,"session":"EXTENDED","venues":{"venue-a":261.2093,"venue-b":261.2089,"venue-c":261.2089,"offshore":261.209}},{"ts":1793138400000,"fv":261.7198,"lo":248.1366,"hi":275.3031,"session":"EXTENDED","venues":{"venue-a":261.5456,"venue-b":261.5448,"venue-c":261.5448,"offshore":261.5448}},{"ts":1793142000000,"fv":261.5648,"lo":247.9896,"hi":275.1401,"session":"EXTENDED","venues":{"venue-a":261.629,"venue-b":261.6015,"venue-c":261.6015,"offshore":261.6015}},{"ts":1793145600000,"fv":261.4668,"lo":242.5889,"hi":280.3447,"session":"OVERNIGHT","venues":{"venue-a":261.4756,"venue-b":261.4749,"venue-c":261.4749,"offshore":261.4749}},{"ts":1793149200000,"fv":261.4521,"lo":242.5753,"hi":280.3289,"session":"OVERNIGHT","venues":{"venue-a":261.4583,"venue-b":261.4583,"venue-c":261.4583,"offshore":261.4583}},{"ts":1793152800000,"fv":261.4404,"lo":242.5644,"hi":280.3164,"session":"OVERNIGHT","venues":{"venue-a":261.4432,"venue-b":261.4453,"venue-c":261.4453,"offshore":261.4453}},{"ts":1793156400000,"fv":261.4343,"lo":242.6372,"hi":280.2315,"session":"OVERNIGHT","venues":{"venue-a":261.4317,"venue-b":261.4366,"venue-c":261.4366,"offshore":261.4411}},{"ts":1793160000000,"fv":261.4282,"lo":242.6315,"hi":280.2248,"session":"OVERNIGHT","venues":{"venue-a":261.4306,"venue-b":261.4307,"venue-c":261.4307,"offshore":261.4308}},{"ts":1793163600000,"fv":261.4228,"lo":242.6265,"hi":280.2191,"session":"OVERNIGHT","venues":{"venue-a":261.425,"venue-b":261.425,"venue-c":261.425,"offshore":261.425}},{"ts":1793167200000,"fv":261.417,"lo":242.5427,"hi":280.2913,"session":"OVERNIGHT","venues":{"venue-a":261.4173,"venue-b":261.4196,"venue-c":261.4196,"offshore":261.4196}},{"ts":1793170800000,"fv":261.4109,"lo":242.6154,"hi":280.2063,"session":"OVERNIGHT","venues":{"venue-a":261.415,"venue-b":261.4132,"venue-c":261.4132,"offshore":261.4107}},{"ts":1793174400000,"fv":261.4295,"lo":247.8613,"hi":274.9977,"session":"EXTENDED","venues":{"venue-a":261.4015,"venue-b":261.4169,"venue-c":261.4169,"offshore":261.4168}},{"ts":1793178000000,"fv":260.9032,"lo":247.3101,"hi":274.4963,"session":"EXTENDED","venues":{"venue-a":261.1385,"venue-b":261.1389,"venue-c":261.1389,"offshore":261.1512}},{"ts":1793181600000,"fv":260.359,"lo":246.7943,"hi":273.9237,"session":"EXTENDED","venues":{"venue-a":260.5367,"venue-b":260.5361,"venue-c":260.5361,"offshore":260.5331}},{"ts":1793185200000,"fv":260.2512,"lo":246.6921,"hi":273.8103,"session":"EXTENDED","venues":{"venue-a":260.3519,"venue-b":260.3519,"venue-c":260.3519,"offshore":260.3518}},{"ts":1793188800000,"fv":259.9017,"lo":246.4128,"hi":273.3906,"session":"EXTENDED","venues":{"venue-a":259.9573,"venue-b":259.9499,"venue-c":259.9499,"offshore":259.9499}},{"ts":1793192400000,"fv":259.7067,"lo":246.2279,"hi":273.1855,"session":"EXTENDED","venues":{"venue-a":259.8162,"venue-b":259.816,"venue-c":259.816,"offshore":259.816}},{"ts":1793196000000,"fv":259.1133,"lo":251.1067,"hi":267.1199,"session":"REGULAR","venues":{"venue-a":259.225,"venue-b":259.1975,"venue-c":259.1975,"offshore":259.1975}},{"ts":1793199600000,"fv":259.2394,"lo":251.2289,"hi":267.2499,"session":"REGULAR","venues":{"venue-a":259.015,"venue-b":259.0239,"venue-c":259.0239,"offshore":259.0239}},{"ts":1793203200000,"fv":259.5066,"lo":251.4878,"hi":267.5253,"session":"REGULAR","venues":{"venue-a":259.6029,"venue-b":259.5723,"venue-c":259.5723,"offshore":259.5648}},{"ts":1793206800000,"fv":259.1226,"lo":251.1157,"hi":267.1294,"session":"REGULAR","venues":{"venue-a":259.2739,"venue-b":259.2522,"venue-c":259.2522,"offshore":259.2521}},{"ts":1793210400000,"fv":258.8334,"lo":250.8354,"hi":266.8313,"session":"REGULAR","venues":{"venue-a":258.7499,"venue-b":258.7494,"venue-c":258.7494,"offshore":258.7494}},{"ts":1793214000000,"fv":258.5914,"lo":250.6009,"hi":266.5818,"session":"REGULAR","venues":{"venue-a":258.7368,"venue-b":258.7383,"venue-c":258.7383,"offshore":258.7383}},{"ts":1793217600000,"fv":258.726,"lo":245.2981,"hi":272.1538,"session":"EXTENDED","venues":{"venue-a":258.8004,"venue-b":258.7963,"venue-c":258.7963,"offshore":258.7963}},{"ts":1793221200000,"fv":258.6212,"lo":245.1988,"hi":272.0437,"session":"EXTENDED","venues":{"venue-a":258.6107,"venue-b":258.6097,"venue-c":258.6097,"offshore":258.6097}},{"ts":1793224800000,"fv":259.2397,"lo":245.7852,"hi":272.6943,"session":"EXTENDED","venues":{"venue-a":259.0379,"venue-b":259.0378,"venue-c":259.0378,"offshore":259.0378}},{"ts":1793228400000,"fv":259.4564,"lo":245.9906,"hi":272.9222,"session":"EXTENDED","venues":{"venue-a":259.4459,"venue-b":259.4322,"venue-c":259.4322,"offshore":259.4337}},{"ts":1793232000000,"fv":259.4216,"lo":240.6914,"hi":278.1519,"session":"OVERNIGHT","venues":{"venue-a":259.4427,"venue-b":259.4424,"venue-c":259.4424,"offshore":259.4424}},{"ts":1793235600000,"fv":259.3842,"lo":240.6567,"hi":278.1117,"session":"OVERNIGHT","venues":{"venue-a":259.3999,"venue-b":259.3999,"venue-c":259.3999,"offshore":259.3999}},{"ts":1793239200000,"fv":259.3544,"lo":240.629,"hi":278.0798,"session":"OVERNIGHT","venues":{"venue-a":259.3797,"venue-b":259.3669,"venue-c":259.3669,"offshore":259.3669}},{"ts":1793242800000,"fv":259.3298,"lo":240.6062,"hi":278.0535,"session":"OVERNIGHT","venues":{"venue-a":259.309,"venue-b":259.3401,"venue-c":259.3401,"offshore":259.3401}},{"ts":1793246400000,"fv":259.3091,"lo":240.587,"hi":278.0312,"session":"OVERNIGHT","venues":{"venue-a":259.317,"venue-b":259.3178,"venue-c":259.3178,"offshore":259.3178}},{"ts":1793250000000,"fv":259.2913,"lo":240.5704,"hi":278.0121,"session":"OVERNIGHT","venues":{"venue-a":259.2993,"venue-b":259.2987,"venue-c":259.2987,"offshore":259.2987}},{"ts":1793253600000,"fv":259.2757,"lo":240.556,"hi":277.9954,"session":"OVERNIGHT","venues":{"venue-a":259.2806,"venue-b":259.2822,"venue-c":259.2822,"offshore":259.2822}},{"ts":1793257200000,"fv":259.2619,"lo":240.5432,"hi":277.9806,"session":"OVERNIGHT","venues":{"venue-a":259.2676,"venue-b":259.2676,"venue-c":259.2676,"offshore":259.2676}},{"ts":1793260800000,"fv":259.5293,"lo":246.0078,"hi":273.0508,"session":"EXTENDED","venues":{"venue-a":259.3713,"venue-b":259.3713,"venue-c":259.3713,"offshore":259.3729}},{"ts":1793264400000,"fv":259.2305,"lo":245.8282,"hi":272.6327,"session":"EXTENDED","venues":{"venue-a":259.2701,"venue-b":259.2824,"venue-c":259.2824,"offshore":259.2985}},{"ts":1793268000000,"fv":259.016,"lo":245.5731,"hi":272.4589,"session":"EXTENDED","venues":{"venue-a":259.0989,"venue-b":259.1142,"venue-c":259.1142,"offshore":259.1146}},{"ts":1793271600000,"fv":258.9972,"lo":245.5553,"hi":272.4392,"session":"EXTENDED","venues":{"venue-a":258.9884,"venue-b":258.9881,"venue-c":258.9881,"offshore":258.9881}},{"ts":1793275200000,"fv":259.3174,"lo":245.8589,"hi":272.776,"session":"EXTENDED","venues":{"venue-a":259.1554,"venue-b":259.1588,"venue-c":259.1588,"offshore":259.1588}},{"ts":1793278800000,"fv":259.6741,"lo":246.197,"hi":273.1512,"session":"EXTENDED","venues":{"venue-a":259.5386,"venue-b":259.5387,"venue-c":259.5387,"offshore":259.5387}},{"ts":1793282400000,"fv":259.7711,"lo":251.7442,"hi":267.7981,"session":"REGULAR","venues":{"venue-a":259.8741,"venue-b":259.8668,"venue-c":259.8668,"offshore":259.8661}},{"ts":1793286000000,"fv":259.8097,"lo":251.7816,"hi":267.8379,"session":"REGULAR","venues":{"venue-a":259.6928,"venue-b":259.7427,"venue-c":259.7427,"offshore":259.7266}},{"ts":1793289600000,"fv":259.4459,"lo":251.429,"hi":267.4628,"session":"REGULAR","venues":{"venue-a":259.4438,"venue-b":259.4267,"venue-c":259.4267,"offshore":259.4419}},{"ts":1793293200000,"fv":260.0795,"lo":252.043,"hi":268.1159,"session":"REGULAR","venues":{"venue-a":259.9553,"venue-b":259.9481,"venue-c":259.9481,"offshore":259.9485}},{"ts":1793296800000,"fv":259.8915,"lo":251.8608,"hi":267.9221,"session":"REGULAR","venues":{"venue-a":259.9255,"venue-b":259.9256,"venue-c":259.9256,"offshore":259.9256}},{"ts":1793300400000,"fv":260.1061,"lo":252.0689,"hi":268.1434,"session":"REGULAR","venues":{"venue-a":260.055,"venue-b":260.0518,"venue-c":260.0518,"offshore":260.0507}},{"ts":1793304000000,"fv":260.1462,"lo":246.6446,"hi":273.6477,"session":"EXTENDED","venues":{"venue-a":260.0279,"venue-b":260.0052,"venue-c":260.0052,"offshore":260.0082}},{"ts":1793307600000,"fv":260.6076,"lo":247.0821,"hi":274.1332,"session":"EXTENDED","venues":{"venue-a":260.4505,"venue-b":260.468,"venue-c":260.468,"offshore":260.4623}},{"ts":1793311200000,"fv":261.0728,"lo":247.5231,"hi":274.6225,"session":"EXTENDED","venues":{"venue-a":260.96,"venue-b":260.9605,"venue-c":260.9605,"offshore":260.9603}},{"ts":1793314800000,"fv":261.4374,"lo":247.8688,"hi":275.006,"session":"EXTENDED","venues":{"venue-a":261.3671,"venue-b":261.368,"venue-c":261.368,"offshore":261.3679}},{"ts":1793318400000,"fv":261.5711,"lo":242.6857,"hi":280.4566,"session":"OVERNIGHT","venues":{"venue-a":261.6179,"venue-b":261.6179,"venue-c":261.6179,"offshore":261.6179}},{"ts":1793322000000,"fv":261.4868,"lo":242.6075,"hi":280.3662,"session":"OVERNIGHT","venues":{"venue-a":261.5222,"venue-b":261.5222,"venue-c":261.5222,"offshore":261.5222}},{"ts":1793325600000,"fv":261.4196,"lo":242.5451,"hi":280.2941,"session":"OVERNIGHT","venues":{"venue-a":261.4474,"venue-b":261.4477,"venue-c":261.4477,"offshore":261.4477}},{"ts":1793329200000,"fv":261.3642,"lo":242.4937,"hi":280.2347,"session":"OVERNIGHT","venues":{"venue-a":261.3803,"venue-b":261.3873,"venue-c":261.3873,"offshore":261.3873}},{"ts":1793332800000,"fv":261.3078,"lo":242.363,"hi":280.2526,"session":"OVERNIGHT","venues":{"venue-a":261.3331,"venue-b":261.3333,"venue-c":261.3333,"offshore":261.3287}},{"ts":1793336400000,"fv":261.2638,"lo":242.4006,"hi":280.1271,"session":"OVERNIGHT","venues":{"venue-a":261.2743,"venue-b":261.2805,"venue-c":261.2805,"offshore":261.2804}},{"ts":1793340000000,"fv":261.229,"lo":242.3683,"hi":280.0898,"session":"OVERNIGHT","venues":{"venue-a":261.2434,"venue-b":261.2435,"venue-c":261.2435,"offshore":261.2435}},{"ts":1793343600000,"fv":261.1982,"lo":242.3397,"hi":280.0567,"session":"OVERNIGHT","venues":{"venue-a":261.2278,"venue-b":261.2111,"venue-c":261.2111,"offshore":261.2111}},{"ts":1793347200000,"fv":261.6539,"lo":248.0741,"hi":275.2337,"session":"EXTENDED","venues":{"venue-a":261.3805,"venue-b":261.38,"venue-c":261.38,"offshore":261.38}},{"ts":1793350800000,"fv":262.4984,"lo":248.8747,"hi":276.122,"session":"EXTENDED","venues":{"venue-a":262.2104,"venue-b":262.2183,"venue-c":262.2183,"offshore":262.2192}},{"ts":1793354400000,"fv":263.0337,"lo":249.3296,"hi":276.7378,"session":"EXTENDED","venues":{"venue-a":262.7648,"venue-b":262.7646,"venue-c":262.7646,"offshore":262.7782}},{"ts":1793358000000,"fv":263.8091,"lo":250.0646,"hi":277.5535,"session":"EXTENDED","venues":{"venue-a":263.5329,"venue-b":263.5328,"venue-c":263.5328,"offshore":263.5332}},{"ts":1793361600000,"fv":263.986,"lo":250.2324,"hi":277.7397,"session":"EXTENDED","venues":{"venue-a":263.8825,"venue-b":263.8825,"venue-c":263.8825,"offshore":263.8843}},{"ts":1793365200000,"fv":264.1017,"lo":250.3948,"hi":277.8086,"session":"EXTENDED","venues":{"venue-a":264.1847,"venue-b":264.1505,"venue-c":264.1505,"offshore":264.1505}},{"ts":1793368800000,"fv":264.7631,"lo":256.5819,"hi":272.9443,"session":"REGULAR","venues":{"venue-a":264.6297,"venue-b":264.6285,"venue-c":264.6285,"offshore":264.6285}},{"ts":1793372400000,"fv":265.2493,"lo":257.0531,"hi":273.4456,"session":"REGULAR","venues":{"venue-a":265.3595,"venue-b":265.3562,"venue-c":265.3562,"offshore":265.3562}},{"ts":1793376000000,"fv":264.3072,"lo":256.1402,"hi":272.4743,"session":"REGULAR","venues":{"venue-a":264.5598,"venue-b":264.5531,"venue-c":264.5531,"offshore":264.5531}},{"ts":1793379600000,"fv":264.884,"lo":256.6991,"hi":273.0689,"session":"REGULAR","venues":{"venue-a":264.6861,"venue-b":264.6631,"venue-c":264.6631,"offshore":264.6631}},{"ts":1793383200000,"fv":265.1104,"lo":256.9184,"hi":273.3023,"session":"REGULAR","venues":{"venue-a":265.2208,"venue-b":265.2218,"venue-c":265.2218,"offshore":265.2218}},{"ts":1793386800000,"fv":264.3661,"lo":256.1972,"hi":272.535,"session":"REGULAR","venues":{"venue-a":264.4913,"venue-b":264.4983,"venue-c":264.4983,"offshore":264.4983}},{"ts":1793390400000,"fv":263.9027,"lo":250.2061,"hi":277.5992,"session":"EXTENDED","venues":{"venue-a":264,"venue-b":264.0044,"venue-c":264.0044,"offshore":264.0036}},{"ts":1793394000000,"fv":263.3314,"lo":249.6645,"hi":276.9983,"session":"EXTENDED","venues":{"venue-a":263.5198,"venue-b":263.5199,"venue-c":263.5199,"offshore":263.5199}},{"ts":1793397600000,"fv":263.2506,"lo":249.5879,"hi":276.9133,"session":"EXTENDED","venues":{"venue-a":263.2572,"venue-b":263.2572,"venue-c":263.2572,"offshore":263.2572}},{"ts":1793401200000,"fv":263.3652,"lo":249.6965,"hi":277.0339,"session":"EXTENDED","venues":{"venue-a":263.2819,"venue-b":263.2807,"venue-c":263.2807,"offshore":263.2807}},{"ts":1793404800000,"fv":263.402,"lo":236.4823,"hi":290.3217,"session":"CLOSED","venues":{"venue-a":263.3831,"venue-b":263.3813,"venue-c":263.3813,"offshore":263.3813}},{"ts":1793408400000,"fv":263.4394,"lo":236.5159,"hi":290.3629,"session":"CLOSED","venues":{"venue-a":263.4256,"venue-b":263.4237,"venue-c":263.4237,"offshore":263.4237}},{"ts":1793412000000,"fv":263.4692,"lo":236.5426,"hi":290.3957,"session":"CLOSED","venues":{"venue-a":263.4568,"venue-b":263.4567,"venue-c":263.4567,"offshore":263.4567}},{"ts":1793415600000,"fv":263.4937,"lo":236.5647,"hi":290.4228,"session":"CLOSED","venues":{"venue-a":263.4835,"venue-b":263.4835,"venue-c":263.4835,"offshore":263.4835}},{"ts":1793419200000,"fv":263.5145,"lo":236.5833,"hi":290.4456,"session":"CLOSED","venues":{"venue-a":263.499,"venue-b":263.5058,"venue-c":263.5058,"offshore":263.5058}},{"ts":1793422800000,"fv":263.5323,"lo":236.5993,"hi":290.4653,"session":"CLOSED","venues":{"venue-a":263.5247,"venue-b":263.5249,"venue-c":263.5249,"offshore":263.5249}},{"ts":1793426400000,"fv":263.5441,"lo":236.689,"hi":290.3993,"session":"CLOSED","venues":{"venue-a":263.5393,"venue-b":263.5393,"venue-c":263.5393,"offshore":263.5393}},{"ts":1793430000000,"fv":263.5587,"lo":236.623,"hi":290.4944,"session":"CLOSED","venues":{"venue-a":263.5529,"venue-b":263.5529,"venue-c":263.5529,"offshore":263.5529}},{"ts":1793433600000,"fv":263.5703,"lo":236.6335,"hi":290.5072,"session":"CLOSED","venues":{"venue-a":263.5652,"venue-b":263.5652,"venue-c":263.5652,"offshore":263.5652}},{"ts":1793437200000,"fv":263.5804,"lo":236.7215,"hi":290.4392,"session":"CLOSED","venues":{"venue-a":263.5769,"venue-b":263.5769,"venue-c":263.5769,"offshore":263.5769}},{"ts":1793440800000,"fv":263.5911,"lo":236.6521,"hi":290.5301,"session":"CLOSED","venues":{"venue-a":263.6163,"venue-b":263.5868,"venue-c":263.5868,"offshore":263.5868}},{"ts":1793444400000,"fv":263.6004,"lo":236.6605,"hi":290.5404,"session":"CLOSED","venues":{"venue-a":263.5973,"venue-b":263.5965,"venue-c":263.5965,"offshore":263.5965}},{"ts":1793448000000,"fv":263.607,"lo":236.7454,"hi":290.4686,"session":"CLOSED","venues":{"venue-a":263.6044,"venue-b":263.6043,"venue-c":263.6043,"offshore":263.6043}},{"ts":1793451600000,"fv":263.6148,"lo":236.6734,"hi":290.5563,"session":"CLOSED","venues":{"venue-a":263.6115,"venue-b":263.6115,"venue-c":263.6115,"offshore":263.6115}},{"ts":1793455200000,"fv":263.6249,"lo":236.577,"hi":290.6729,"session":"CLOSED","venues":{"venue-a":263.6209,"venue-b":263.6209,"venue-c":263.6209,"offshore":263.6215}},{"ts":1793458800000,"fv":263.632,"lo":236.6888,"hi":290.5752,"session":"CLOSED","venues":{"venue-a":263.6599,"venue-b":263.6292,"venue-c":263.6292,"offshore":263.6292}},{"ts":1793462400000,"fv":263.6385,"lo":236.6946,"hi":290.5823,"session":"CLOSED","venues":{"venue-a":263.6366,"venue-b":263.6358,"venue-c":263.6358,"offshore":263.6358}},{"ts":1793466000000,"fv":263.6445,"lo":236.7,"hi":290.589,"session":"CLOSED","venues":{"venue-a":263.642,"venue-b":263.642,"venue-c":263.642,"offshore":263.642}},{"ts":1793469600000,"fv":263.6502,"lo":236.7051,"hi":290.5952,"session":"CLOSED","venues":{"venue-a":263.6478,"venue-b":263.6478,"venue-c":263.6478,"offshore":263.6478}},{"ts":1793473200000,"fv":263.6556,"lo":236.71,"hi":290.6012,"session":"CLOSED","venues":{"venue-a":263.6567,"venue-b":263.6533,"venue-c":263.6533,"offshore":263.6533}},{"ts":1793476800000,"fv":263.6606,"lo":236.7145,"hi":290.6068,"session":"CLOSED","venues":{"venue-a":263.6586,"venue-b":263.6585,"venue-c":263.6585,"offshore":263.6585}},{"ts":1793480400000,"fv":263.6655,"lo":236.7189,"hi":290.6121,"session":"CLOSED","venues":{"venue-a":263.6635,"venue-b":263.6635,"venue-c":263.6635,"offshore":263.6635}},{"ts":1793484000000,"fv":263.67,"lo":236.723,"hi":290.6171,"session":"CLOSED","venues":{"venue-a":263.6681,"venue-b":263.6681,"venue-c":263.6681,"offshore":263.6681}},{"ts":1793487600000,"fv":263.6744,"lo":236.7269,"hi":290.6219,"session":"CLOSED","venues":{"venue-a":263.6726,"venue-b":263.6726,"venue-c":263.6726,"offshore":263.6726}},{"ts":1793491200000,"fv":263.6786,"lo":236.7306,"hi":290.6265,"session":"CLOSED","venues":{"venue-a":263.6768,"venue-b":263.6768,"venue-c":263.6768,"offshore":263.6768}},{"ts":1793494800000,"fv":263.682,"lo":236.7337,"hi":290.6303,"session":"CLOSED","venues":{"venue-a":263.6781,"venue-b":263.6804,"venue-c":263.6804,"offshore":263.6804}},{"ts":1793498400000,"fv":263.6855,"lo":236.7368,"hi":290.6341,"session":"CLOSED","venues":{"venue-a":263.7007,"venue-b":263.6839,"venue-c":263.6839,"offshore":263.6839}},{"ts":1793502000000,"fv":263.6897,"lo":236.7406,"hi":290.6387,"session":"CLOSED","venues":{"venue-a":263.6886,"venue-b":263.6881,"venue-c":263.6881,"offshore":263.6881}},{"ts":1793505600000,"fv":263.6891,"lo":236.7401,"hi":290.6381,"session":"CLOSED","venues":{"venue-a":263.6745,"venue-b":263.6876,"venue-c":263.6876,"offshore":263.6876}},{"ts":1793509200000,"fv":263.6925,"lo":236.7431,"hi":290.6419,"session":"CLOSED","venues":{"venue-a":263.6908,"venue-b":263.6911,"venue-c":263.6911,"offshore":263.6911}},{"ts":1793512800000,"fv":263.6918,"lo":236.8216,"hi":290.562,"session":"CLOSED","venues":{"venue-a":263.6898,"venue-b":263.6915,"venue-c":263.6915,"offshore":263.6904}},{"ts":1793516400000,"fv":263.6941,"lo":236.8237,"hi":290.5646,"session":"CLOSED","venues":{"venue-a":263.6931,"venue-b":263.6932,"venue-c":263.6932,"offshore":263.6931}},{"ts":1793520000000,"fv":263.6967,"lo":236.7469,"hi":290.6466,"session":"CLOSED","venues":{"venue-a":263.715,"venue-b":263.6955,"venue-c":263.6955,"offshore":263.6955}},{"ts":1793523600000,"fv":263.6997,"lo":236.7496,"hi":290.6498,"session":"CLOSED","venues":{"venue-a":263.699,"venue-b":263.6985,"venue-c":263.6985,"offshore":263.6985}},{"ts":1793527200000,"fv":263.7026,"lo":236.7522,"hi":290.653,"session":"CLOSED","venues":{"venue-a":263.7014,"venue-b":263.7014,"venue-c":263.7014,"offshore":263.7014}},{"ts":1793530800000,"fv":263.7054,"lo":236.7547,"hi":290.6561,"session":"CLOSED","venues":{"venue-a":263.7042,"venue-b":263.7042,"venue-c":263.7042,"offshore":263.7042}},{"ts":1793534400000,"fv":263.7081,"lo":236.7571,"hi":290.659,"session":"CLOSED","venues":{"venue-a":263.7069,"venue-b":263.7069,"venue-c":263.7069,"offshore":263.7069}},{"ts":1793538000000,"fv":263.7107,"lo":236.7594,"hi":290.6619,"session":"CLOSED","venues":{"venue-a":263.7096,"venue-b":263.7096,"venue-c":263.7096,"offshore":263.7096}},{"ts":1793541600000,"fv":263.713,"lo":236.7615,"hi":290.6645,"session":"CLOSED","venues":{"venue-a":263.6923,"venue-b":263.712,"venue-c":263.712,"offshore":263.712}},{"ts":1793545200000,"fv":263.7155,"lo":236.7637,"hi":290.6672,"session":"CLOSED","venues":{"venue-a":263.7174,"venue-b":263.7144,"venue-c":263.7144,"offshore":263.7144}},{"ts":1793548800000,"fv":263.717,"lo":236.7651,"hi":290.6689,"session":"CLOSED","venues":{"venue-a":263.7151,"venue-b":263.716,"venue-c":263.716,"offshore":263.716}},{"ts":1793552400000,"fv":263.7191,"lo":236.8461,"hi":290.592,"session":"CLOSED","venues":{"venue-a":263.7183,"venue-b":263.7184,"venue-c":263.7184,"offshore":263.7184}},{"ts":1793556000000,"fv":263.7213,"lo":236.769,"hi":290.6736,"session":"CLOSED","venues":{"venue-a":263.7125,"venue-b":263.7203,"venue-c":263.7203,"offshore":263.7203}},{"ts":1793559600000,"fv":263.729,"lo":236.855,"hi":290.603,"session":"CLOSED","venues":{"venue-a":263.7281,"venue-b":263.7264,"venue-c":263.7264,"offshore":263.7305}},{"ts":1793563200000,"fv":263.7305,"lo":236.8564,"hi":290.6047,"session":"CLOSED","venues":{"venue-a":263.7299,"venue-b":263.7298,"venue-c":263.7298,"offshore":263.7299}},{"ts":1793566800000,"fv":263.732,"lo":236.8577,"hi":290.6063,"session":"CLOSED","venues":{"venue-a":263.7314,"venue-b":263.7314,"venue-c":263.7314,"offshore":263.7314}},{"ts":1793570400000,"fv":263.7348,"lo":236.6756,"hi":290.794,"session":"CLOSED","venues":{"venue-a":263.7337,"venue-b":263.7337,"venue-c":263.7337,"offshore":263.734}},{"ts":1793574000000,"fv":263.7172,"lo":236.7653,"hi":290.6691,"session":"CLOSED","venues":{"venue-a":263.7553,"venue-b":263.7363,"venue-c":263.7363,"offshore":263.7363}},{"ts":1793577600000,"fv":263.6725,"lo":236.7252,"hi":290.6198,"session":"CLOSED","venues":{"venue-a":263.6916,"venue-b":263.6911,"venue-c":263.6911,"offshore":263.6911}},{"ts":1793581200000,"fv":263.629,"lo":244.595,"hi":282.6631,"session":"OVERNIGHT","venues":{"venue-a":263.6349,"venue-b":263.6471,"venue-c":263.6471,"offshore":263.6471}},{"ts":1793584800000,"fv":263.5868,"lo":244.5558,"hi":282.6177,"session":"OVERNIGHT","venues":{"venue-a":263.6041,"venue-b":263.6044,"venue-c":263.6044,"offshore":263.6044}},{"ts":1793588400000,"fv":263.5376,"lo":244.4048,"hi":282.6705,"session":"OVERNIGHT","venues":{"venue-a":263.5605,"venue-b":263.5599,"venue-c":263.5599,"offshore":263.5624}},{"ts":1793592000000,"fv":263.4852,"lo":244.3562,"hi":282.6143,"session":"OVERNIGHT","venues":{"venue-a":263.507,"venue-b":263.507,"venue-c":263.507,"offshore":263.5071}},{"ts":1793595600000,"fv":263.4343,"lo":244.309,"hi":282.5596,"session":"OVERNIGHT","venues":{"venue-a":263.4555,"venue-b":263.4555,"venue-c":263.4555,"offshore":263.4555}},{"ts":1793599200000,"fv":263.3956,"lo":244.3784,"hi":282.4127,"session":"OVERNIGHT","venues":{"venue-a":263.4277,"venue-b":263.4113,"venue-c":263.4113,"offshore":263.4113}},{"ts":1793602800000,"fv":263.3587,"lo":244.3442,"hi":282.3732,"session":"OVERNIGHT","venues":{"venue-a":263.3753,"venue-b":263.374,"venue-c":263.374,"offshore":263.374}},{"ts":1793606400000,"fv":263.3228,"lo":244.3108,"hi":282.3347,"session":"OVERNIGHT","venues":{"venue-a":263.3372,"venue-b":263.3377,"venue-c":263.3377,"offshore":263.3377}},{"ts":1793610000000,"fv":263.4044,"lo":249.7337,"hi":277.0751,"session":"EXTENDED","venues":{"venue-a":263.3719,"venue-b":263.3494,"venue-c":263.3494,"offshore":263.3494}},{"ts":1793613600000,"fv":263.2985,"lo":249.6333,"hi":276.9637,"session":"EXTENDED","venues":{"venue-a":263.2606,"venue-b":263.2543,"venue-c":263.2543,"offshore":263.2543}},{"ts":1793617200000,"fv":263.3046,"lo":249.6391,"hi":276.9701,"session":"EXTENDED","venues":{"venue-a":263.3235,"venue-b":263.3233,"venue-c":263.3233,"offshore":263.3233}},{"ts":1793620800000,"fv":263.2564,"lo":249.6461,"hi":276.8668,"session":"EXTENDED","venues":{"venue-a":263.2126,"venue-b":263.2126,"venue-c":263.2126,"offshore":263.2126}},{"ts":1793624400000,"fv":263.4343,"lo":249.762,"hi":277.1065,"session":"EXTENDED","venues":{"venue-a":263.4359,"venue-b":263.4333,"venue-c":263.4333,"offshore":263.4343}},{"ts":1793628000000,"fv":263.1099,"lo":249.4545,"hi":276.7653,"session":"EXTENDED","venues":{"venue-a":263.1938,"venue-b":263.1998,"venue-c":263.1998,"offshore":263.1998}},{"ts":1793631600000,"fv":262.0764,"lo":253.9783,"hi":270.1746,"session":"REGULAR","venues":{"venue-a":262.1217,"venue-b":262.118,"venue-c":262.118,"offshore":262.118}}],"NVDA":[{"ts":1793001600000,"fv":184.8829,"lo":175.2875,"hi":194.4783,"session":"EXTENDED","venues":{"venue-a":184.9598,"venue-b":184.9573,"venue-c":184.9573,"offshore":184.9573}},{"ts":1793005200000,"fv":184.7537,"lo":175.165,"hi":194.3424,"session":"EXTENDED","venues":{"venue-a":184.8112,"venue-b":184.8112,"venue-c":184.8112,"offshore":184.8112}},{"ts":1793008800000,"fv":184.9486,"lo":175.3498,"hi":194.5475,"session":"EXTENDED","venues":{"venue-a":184.8514,"venue-b":184.8514,"venue-c":184.8514,"offshore":184.8514}},{"ts":1793012400000,"fv":184.4758,"lo":174.9015,"hi":194.0501,"session":"EXTENDED","venues":{"venue-a":184.5977,"venue-b":184.6003,"venue-c":184.6003,"offshore":184.6003}},{"ts":1793016000000,"fv":184.1577,"lo":174.5631,"hi":193.7523,"session":"EXTENDED","venues":{"venue-a":184.2735,"venue-b":184.2735,"venue-c":184.2735,"offshore":184.2719}},{"ts":1793019600000,"fv":184.7919,"lo":175.2012,"hi":194.3826,"session":"EXTENDED","venues":{"venue-a":184.6547,"venue-b":184.6552,"venue-c":184.6552,"offshore":184.6552}},{"ts":1793023200000,"fv":185.8238,"lo":180.0819,"hi":191.5658,"session":"REGULAR","venues":{"venue-a":185.8043,"venue-b":185.7962,"venue-c":185.7962,"offshore":185.7971}},{"ts":1793026800000,"fv":186.3803,"lo":180.6212,"hi":192.1395,"session":"REGULAR","venues":{"venue-a":186.1109,"venue-b":186.0883,"venue-c":186.0883,"offshore":186.0895}},{"ts":1793030400000,"fv":185.8535,"lo":180.1106,"hi":191.5963,"session":"REGULAR","venues":{"venue-a":186.1239,"venue-b":186.1183,"venue-c":186.1183,"offshore":186.1183}},{"ts":1793034000000,"fv":186.7659,"lo":180.9948,"hi":192.537,"session":"REGULAR","venues":{"venue-a":186.62,"venue-b":186.6198,"venue-c":186.6198,"offshore":186.611}},{"ts":1793037600000,"fv":185.8403,"lo":180.0978,"hi":191.5827,"session":"REGULAR","venues":{"venue-a":185.9865,"venue-b":186.0159,"venue-c":186.0159,"offshore":186.0156}},{"ts":1793041200000,"fv":185.3465,"lo":179.6193,"hi":191.0737,"session":"REGULAR","venues":{"venue-a":185.4339,"venue-b":185.4292,"venue-c":185.4292,"offshore":185.433}},{"ts":1793044800000,"fv":184.799,"lo":175.2449,"hi":194.3531,"session":"EXTENDED","venues":{"venue-a":184.8937,"venue-b":184.8758,"venue-c":184.8758,"offshore":184.8844}},{"ts":1793048400000,"fv":184.683,"lo":175.1349,"hi":194.2311,"session":"EXTENDED","venues":{"venue-a":184.7187,"venue-b":184.7182,"venue-c":184.7182,"offshore":184.7184}},{"ts":1793052000000,"fv":185.1859,"lo":175.5377,"hi":194.8341,"session":"EXTENDED","venues":{"venue-a":184.9744,"venue-b":184.9744,"venue-c":184.9744,"offshore":184.9703}},{"ts":1793055600000,"fv":185.9713,"lo":176.2822,"hi":195.6604,"session":"EXTENDED","venues":{"venue-a":185.7659,"venue-b":185.7659,"venue-c":185.7659,"offshore":185.7662}},{"ts":1793059200000,"fv":185.7511,"lo":172.3398,"hi":199.1623,"session":"OVERNIGHT","venues":{"venue-a":185.7579,"venue-b":185.7566,"venue-c":185.7566,"offshore":185.7566}},{"ts":1793062800000,"fv":185.7408,"lo":172.3303,"hi":199.1513,"session":"OVERNIGHT","venues":{"venue-a":185.7452,"venue-b":185.7452,"venue-c":185.7452,"offshore":185.7452}},{"ts":1793066400000,"fv":185.7323,"lo":172.3224,"hi":199.1422,"session":"OVERNIGHT","venues":{"venue-a":185.7359,"venue-b":185.7359,"venue-c":185.7359,"offshore":185.7359}},{"ts":1793070000000,"fv":185.7251,"lo":172.3158,"hi":199.1345,"session":"OVERNIGHT","venues":{"venue-a":185.7288,"venue-b":185.7281,"venue-c":185.7281,"offshore":185.7281}},{"ts":1793073600000,"fv":185.7189,"lo":172.31,"hi":199.1278,"session":"OVERNIGHT","venues":{"venue-a":185.728,"venue-b":185.7215,"venue-c":185.7215,"offshore":185.7215}},{"ts":1793077200000,"fv":185.7134,"lo":172.3049,"hi":199.1219,"session":"OVERNIGHT","venues":{"venue-a":185.7093,"venue-b":185.7157,"venue-c":185.7157,"offshore":185.7157}},{"ts":1793080800000,"fv":185.7088,"lo":172.3006,"hi":199.1169,"session":"OVERNIGHT","venues":{"venue-a":185.7107,"venue-b":185.7108,"venue-c":185.7108,"offshore":185.7108}},{"ts":1793084400000,"fv":185.703,"lo":172.221,"hi":199.1851,"session":"OVERNIGHT","venues":{"venue-a":185.7055,"venue-b":185.7055,"venue-c":185.7055,"offshore":185.7065}},{"ts":1793088000000,"fv":185.3179,"lo":175.6629,"hi":194.973,"session":"EXTENDED","venues":{"venue-a":185.5403,"venue-b":185.5403,"venue-c":185.5403,"offshore":185.5403}},{"ts":1793091600000,"fv":185.5916,"lo":175.9594,"hi":195.2238,"session":"EXTENDED","venues":{"venue-a":185.5378,"venue-b":185.5366,"venue-c":185.5366,"offshore":185.5366}},{"ts":1793095200000,"fv":185.5835,"lo":175.9518,"hi":195.2153,"session":"EXTENDED","venues":{"venue-a":185.5519,"venue-b":185.5518,"venue-c":185.5518,"offshore":185.5518}},{"ts":1793098800000,"fv":185.4794,"lo":175.853,"hi":195.1058,"session":"EXTENDED","venues":{"venue-a":185.4376,"venue-b":185.4382,"venue-c":185.4382,"offshore":185.4382}},{"ts":1793102400000,"fv":185.3309,"lo":175.7123,"hi":194.9496,"session":"EXTENDED","venues":{"venue-a":185.3614,"venue-b":185.3615,"venue-c":185.3615,"offshore":185.3615}},{"ts":1793106000000,"fv":185.2802,"lo":175.6641,"hi":194.8962,"session":"EXTENDED","venues":{"venue-a":185.2866,"venue-b":185.2881,"venue-c":185.2881,"offshore":185.2881}},{"ts":1793109600000,"fv":185.5323,"lo":179.7994,"hi":191.2653,"session":"REGULAR","venues":{"venue-a":185.5171,"venue-b":185.5104,"venue-c":185.5104,"offshore":185.5122}},{"ts":1793113200000,"fv":185.3948,"lo":179.6661,"hi":191.1235,"session":"REGULAR","venues":{"venue-a":185.6768,"venue-b":185.6773,"venue-c":185.6773,"offshore":185.6795}},{"ts":1793116800000,"fv":184.4572,"lo":178.7575,"hi":190.157,"session":"REGULAR","venues":{"venue-a":184.7257,"venue-b":184.7188,"venue-c":184.7188,"offshore":184.7189}},{"ts":1793120400000,"fv":183.8597,"lo":178.1784,"hi":189.5409,"session":"REGULAR","venues":{"venue-a":184.0463,"venue-b":184.0515,"venue-c":184.0515,"offshore":184.0515}},{"ts":1793124000000,"fv":183.5813,"lo":177.9086,"hi":189.254,"session":"REGULAR","venues":{"venue-a":183.6971,"venue-b":183.6983,"venue-c":183.6983,"offshore":183.6983}},{"ts":1793127600000,"fv":183.1492,"lo":177.4899,"hi":188.8085,"session":"REGULAR","venues":{"venue-a":183.3283,"venue-b":183.324,"venue-c":183.324,"offshore":183.324}},{"ts":1793131200000,"fv":183.0794,"lo":173.5776,"hi":192.5812,"session":"EXTENDED","venues":{"venue-a":183.1602,"venue-b":183.1627,"venue-c":183.1627,"offshore":183.1627}},{"ts":1793134800000,"fv":183.7104,"lo":174.1758,"hi":193.245,"session":"EXTENDED","venues":{"venue-a":183.4878,"venue-b":183.4879,"venue-c":183.4879,"offshore":183.4879}},{"ts":1793138400000,"fv":183.8963,"lo":174.3153,"hi":193.4773,"session":"EXTENDED","venues":{"venue-a":183.95,"venue-b":183.95,"venue-c":183.95,"offshore":183.9415}},{"ts":1793142000000,"fv":183.5401,"lo":173.9776,"hi":193.1025,"session":"EXTENDED","venues":{"venue-a":183.6704,"venue-b":183.6704,"venue-c":183.6704,"offshore":183.6748}},{"ts":1793145600000,"fv":183.4537,"lo":170.2084,"hi":196.6991,"session":"OVERNIGHT","venues":{"venue-a":183.4412,"venue-b":183.4548,"venue-c":183.4548,"offshore":183.4585}},{"ts":1793149200000,"fv":183.4487,"lo":170.2037,"hi":196.6936,"session":"OVERNIGHT","venues":{"venue-a":183.4504,"venue-b":183.4508,"venue-c":183.4508,"offshore":183.4508}},{"ts":1793152800000,"fv":183.4445,"lo":170.1814,"hi":196.7075,"session":"OVERNIGHT","venues":{"venue-a":183.4426,"venue-b":183.4462,"venue-c":183.4462,"offshore":183.4462}},{"ts":1793156400000,"fv":183.4409,"lo":170.1782,"hi":196.7037,"session":"OVERNIGHT","venues":{"venue-a":183.4639,"venue-b":183.4424,"venue-c":183.4424,"offshore":183.4424}},{"ts":1793160000000,"fv":183.4382,"lo":170.1205,"hi":196.7558,"session":"OVERNIGHT","venues":{"venue-a":183.4402,"venue-b":183.4397,"venue-c":183.4397,"offshore":183.438}},{"ts":1793163600000,"fv":183.4352,"lo":170.1729,"hi":196.6976,"session":"OVERNIGHT","venues":{"venue-a":183.4403,"venue-b":183.4364,"venue-c":183.4364,"offshore":183.4363}},{"ts":1793167200000,"fv":183.4328,"lo":170.1706,"hi":196.695,"session":"OVERNIGHT","venues":{"venue-a":183.4331,"venue-b":183.4338,"venue-c":183.4338,"offshore":183.4338}},{"ts":1793170800000,"fv":183.4306,"lo":170.1686,"hi":196.6927,"session":"OVERNIGHT","venues":{"venue-a":183.4315,"venue-b":183.4315,"venue-c":183.4315,"offshore":183.4315}},{"ts":1793174400000,"fv":183.2162,"lo":173.7072,"hi":192.7251,"session":"EXTENDED","venues":{"venue-a":183.3421,"venue-b":183.3421,"venue-c":183.3421,"offshore":183.3421}},{"ts":1793178000000,"fv":183.4492,"lo":173.9282,"hi":192.9702,"session":"EXTENDED","venues":{"venue-a":183.4362,"venue-b":183.4238,"venue-c":183.4238,"offshore":183.4238}},{"ts":1793181600000,"fv":183.4029,"lo":173.8843,"hi":192.9215,"session":"EXTENDED","venues":{"venue-a":183.3476,"venue-b":183.3472,"venue-c":183.3472,"offshore":183.3472}},{"ts":1793185200000,"fv":183.1133,"lo":173.6098,"hi":192.6169,"session":"EXTENDED","venues":{"venue-a":183.1956,"venue-b":183.1814,"venue-c":183.1814,"offshore":183.1814}},{"ts":1793188800000,"fv":183.0237,"lo":173.5614,"hi":192.4861,"session":"EXTENDED","venues":{"venue-a":183.0254,"venue-b":183.0251,"venue-c":183.0251,"offshore":183.0257}},{"ts":1793192400000,"fv":183.0693,"lo":173.568,"hi":192.5706,"session":"EXTENDED","venues":{"venue-a":183.1067,"venue-b":183.0899,"venue-c":183.0899,"offshore":183.0899}},{"ts":1793196000000,"fv":183.9541,"lo":178.2699,"hi":189.6383,"session":"REGULAR","venues":{"venue-a":183.8954,"venue-b":183.893,"venue-c":183.893,"offshore":183.893}},{"ts":1793199600000,"fv":183.8673,"lo":178.1858,"hi":189.5488,"session":"REGULAR","venues":{"venue-a":183.7835,"venue-b":183.766,"venue-c":183.766,"offshore":183.7656}},{"ts":1793203200000,"fv":183.7743,"lo":178.0957,"hi":189.453,"session":"REGULAR","venues":{"venue-a":183.6819,"venue-b":183.6815,"venue-c":183.6815,"offshore":183.6817}},{"ts":1793206800000,"fv":185.4469,"lo":179.7166,"hi":191.1772,"session":"REGULAR","venues":{"venue-a":185.0637,"venue-b":185.0629,"venue-c":185.0629,"offshore":185.067}},{"ts":1793210400000,"fv":186.2726,"lo":180.5167,"hi":192.0284,"session":"REGULAR","venues":{"venue-a":186.3209,"venue-b":186.3021,"venue-c":186.3021,"offshore":186.3022}},{"ts":1793214000000,"fv":185.4684,"lo":179.7374,"hi":191.1993,"session":"REGULAR","venues":{"venue-a":185.4561,"venue-b":185.4696,"venue-c":185.4696,"offshore":185.4691}},{"ts":1793217600000,"fv":185.5065,"lo":175.8787,"hi":195.1343,"session":"EXTENDED","venues":{"venue-a":185.5015,"venue-b":185.4996,"venue-c":185.4996,"offshore":185.4996}},{"ts":1793221200000,"fv":185.4262,"lo":175.8026,"hi":195.0498,"session":"EXTENDED","venues":{"venue-a":185.3901,"venue-b":185.3901,"venue-c":185.3901,"offshore":185.3901}},{"ts":1793224800000,"fv":185.2522,"lo":175.6746,"hi":194.8297,"session":"EXTENDED","venues":{"venue-a":185.2517,"venue-b":185.2483,"venue-c":185.2483,"offshore":185.2508}},{"ts":1793228400000,"fv":185.0939,"lo":175.4875,"hi":194.7002,"session":"EXTENDED","venues":{"venue-a":185.146,"venue-b":185.141,"venue-c":185.141,"offshore":185.1411}},{"ts":1793232000000,"fv":185.2549,"lo":171.8795,"hi":198.6303,"session":"OVERNIGHT","venues":{"venue-a":185.2519,"venue-b":185.2517,"venue-c":185.2517,"offshore":185.2517}},{"ts":1793235600000,"fv":185.2606,"lo":171.8848,"hi":198.6365,"session":"OVERNIGHT","venues":{"venue-a":185.2582,"venue-b":185.2582,"venue-c":185.2582,"offshore":185.2582}},{"ts":1793239200000,"fv":185.2654,"lo":171.8893,"hi":198.6416,"session":"OVERNIGHT","venues":{"venue-a":185.2634,"venue-b":185.2634,"venue-c":185.2634,"offshore":185.2634}},{"ts":1793242800000,"fv":185.2695,"lo":171.893,"hi":198.6459,"session":"OVERNIGHT","venues":{"venue-a":185.2679,"venue-b":185.2678,"venue-c":185.2678,"offshore":185.2678}},{"ts":1793246400000,"fv":185.273,"lo":171.8963,"hi":198.6497,"session":"OVERNIGHT","venues":{"venue-a":185.2715,"venue-b":185.2715,"venue-c":185.2715,"offshore":185.2715}},{"ts":1793250000000,"fv":185.2761,"lo":171.8992,"hi":198.653,"session":"OVERNIGHT","venues":{"venue-a":185.2722,"venue-b":185.2748,"venue-c":185.2748,"offshore":185.2748}},{"ts":1793253600000,"fv":185.2789,"lo":171.9017,"hi":198.656,"session":"OVERNIGHT","venues":{"venue-a":185.2777,"venue-b":185.2777,"venue-c":185.2777,"offshore":185.2777}},{"ts":1793257200000,"fv":185.2812,"lo":171.9039,"hi":198.6585,"session":"OVERNIGHT","venues":{"venue-a":185.2802,"venue-b":185.2802,"venue-c":185.2802,"offshore":185.2802}},{"ts":1793260800000,"fv":185.0317,"lo":175.4285,"hi":194.6348,"session":"EXTENDED","venues":{"venue-a":185.1795,"venue-b":185.1792,"venue-c":185.1792,"offshore":185.1792}},{"ts":1793264400000,"fv":185.0559,"lo":175.4515,"hi":194.6603,"session":"EXTENDED","venues":{"venue-a":185.1309,"venue-b":185.1309,"venue-c":185.1309,"offshore":185.1309}},{"ts":1793268000000,"fv":185.2017,"lo":175.5897,"hi":194.8137,"session":"EXTENDED","venues":{"venue-a":185.1311,"venue-b":185.1311,"venue-c":185.1311,"offshore":185.1311}},{"ts":1793271600000,"fv":185.6088,"lo":175.9386,"hi":195.279,"session":"EXTENDED","venues":{"venue-a":185.4193,"venue-b":185.4193,"venue-c":185.4193,"offshore":185.4186}},{"ts":1793275200000,"fv":186.3499,"lo":176.6784,"hi":196.0215,"session":"EXTENDED","venues":{"venue-a":186.1226,"venue-b":186.135,"venue-c":186.135,"offshore":186.135}},{"ts":1793278800000,"fv":185.75,"lo":176.1096,"hi":195.3905,"session":"EXTENDED","venues":{"venue-a":185.9182,"venue-b":185.9269,"venue-c":185.9269,"offshore":185.9269}},{"ts":1793282400000,"fv":185.2009,"lo":179.4782,"hi":190.9237,"session":"REGULAR","venues":{"venue-a":185.5441,"venue-b":186.3931,"venue-c":186.4602,"offshore":185.3076}},{"ts":1793286000000,"fv":185.3135,"lo":179.5873,"hi":191.0397,"session":"REGULAR","venues":{"venue-a":185.3679,"venue-b":185.3896,"venue-c":185.3913,"offshore":185.3659}},{"ts":1793289600000,"fv":184.05,"lo":178.3629,"hi":189.7372,"session":"REGULAR","venues":{"venue-a":184.2874,"venue-b":184.288,"venue-c":184.2951,"offshore":184.2873}},{"ts":1793293200000,"fv":184.9934,"lo":179.2771,"hi":190.7097,"session":"REGULAR","venues":{"venue-a":184.781,"venue-b":184.7811,"venue-c":184.7556,"offshore":184.781}},{"ts":1793296800000,"fv":184.9214,"lo":179.2073,"hi":190.6354,"session":"REGULAR","venues":{"venue-a":184.8249,"venue-b":184.8249,"venue-c":184.8259,"offshore":184.8249}},{"ts":1793300400000,"fv":184.1228,"lo":178.4334,"hi":189.8122,"session":"REGULAR","venues":{"venue-a":184.3923,"venue-b":184.3923,"venue-c":184.3637,"offshore":184.3873}},{"ts":1793304000000,"fv":183.9826,"lo":174.4523,"hi":193.5129,"session":"EXTENDED","venues":{"venue-a":183.8867,"venue-b":183.8867,"venue-c":183.8842,"offshore":183.8864}},{"ts":1793307600000,"fv":184.3064,"lo":174.7594,"hi":193.8535,"session":"EXTENDED","venues":{"venue-a":184.1851,"venue-b":184.1851,"venue-c":184.1851,"offshore":184.1851}},{"ts":1793311200000,"fv":184.9475,"lo":175.3672,"hi":194.5278,"session":"EXTENDED","venues":{"venue-a":184.7555,"venue-b":184.7555,"venue-c":184.7555,"offshore":184.7555}},{"ts":1793314800000,"fv":185.7964,"lo":176.1722,"hi":195.4207,"session":"EXTENDED","venues":{"venue-a":185.5481,"venue-b":185.5481,"venue-c":185.5481,"offshore":185.5481}},{"ts":1793318400000,"fv":185.7707,"lo":172.3766,"hi":199.1647,"session":"OVERNIGHT","venues":{"venue-a":185.7858,"venue-b":185.7858,"venue-c":185.7858,"offshore":185.7858}},{"ts":1793322000000,"fv":185.7425,"lo":172.3505,"hi":199.1345,"session":"OVERNIGHT","venues":{"venue-a":185.7544,"venue-b":185.7544,"venue-c":185.7544,"offshore":185.7544}},{"ts":1793325600000,"fv":185.7192,"lo":172.3289,"hi":199.1096,"session":"OVERNIGHT","venues":{"venue-a":185.729,"venue-b":185.729,"venue-c":185.729,"offshore":185.729}},{"ts":1793329200000,"fv":185.7023,"lo":172.3503,"hi":199.0543,"session":"OVERNIGHT","venues":{"venue-a":185.7094,"venue-b":185.7094,"venue-c":185.7094,"offshore":185.7094}},{"ts":1793332800000,"fv":185.6878,"lo":172.3369,"hi":199.0388,"session":"OVERNIGHT","venues":{"venue-a":185.6939,"venue-b":185.6939,"venue-c":185.6939,"offshore":185.6939}},{"ts":1793336400000,"fv":185.675,"lo":172.325,"hi":199.0251,"session":"OVERNIGHT","venues":{"venue-a":185.6804,"venue-b":185.6804,"venue-c":185.6804,"offshore":185.6804}},{"ts":1793340000000,"fv":185.6635,"lo":172.3143,"hi":199.0128,"session":"OVERNIGHT","venues":{"venue-a":185.6684,"venue-b":185.6684,"venue-c":185.6684,"offshore":185.6684}},{"ts":1793343600000,"fv":185.6532,"lo":172.3047,"hi":199.0016,"session":"OVERNIGHT","venues":{"venue-a":185.6575,"venue-b":185.6575,"venue-c":185.6575,"offshore":185.6575}},{"ts":1793347200000,"fv":185.6601,"lo":176.0614,"hi":195.2587,"session":"EXTENDED","venues":{"venue-a":185.6541,"venue-b":185.6541,"venue-c":185.6541,"offshore":185.6541}},{"ts":1793350800000,"fv":185.6533,"lo":176.055,"hi":195.2516,"session":"EXTENDED","venues":{"venue-a":185.6315,"venue-b":185.6315,"venue-c":185.6315,"offshore":185.6315}},{"ts":1793354400000,"fv":186.0474,"lo":176.4287,"hi":195.666,"session":"EXTENDED","venues":{"venue-a":185.9576,"venue-b":185.9576,"venue-c":185.9576,"offshore":185.9576}},{"ts":1793358000000,"fv":185.8547,"lo":176.246,"hi":195.4634,"session":"EXTENDED","venues":{"venue-a":185.9503,"venue-b":185.9503,"venue-c":185.9503,"offshore":185.9503}},{"ts":1793361600000,"fv":184.9974,"lo":175.3591,"hi":194.6358,"session":"EXTENDED","venues":{"venue-a":185.334,"venue-b":185.334,"venue-c":185.334,"offshore":185.3382}},{"ts":1793365200000,"fv":184.7036,"lo":175.0806,"hi":194.3267,"session":"EXTENDED","venues":{"venue-a":184.8791,"venue-b":184.8791,"venue-c":184.8791,"offshore":184.8792}},{"ts":1793368800000,"fv":183.2099,"lo":177.5487,"hi":188.8711,"session":"REGULAR","venues":{"venue-a":183.3686,"venue-b":183.3686,"venue-c":183.3686,"offshore":183.3686}},{"ts":1793372400000,"fv":183.732,"lo":178.0546,"hi":189.4093,"session":"REGULAR","venues":{"venue-a":183.6581,"venue-b":183.6581,"venue-c":183.6581,"offshore":183.6514}},{"ts":1793376000000,"fv":184.0064,"lo":178.3206,"hi":189.6922,"session":"REGULAR","venues":{"venue-a":183.9012,"venue-b":183.9012,"venue-c":183.9012,"offshore":183.8993}},{"ts":1793379600000,"fv":183.5435,"lo":177.872,"hi":189.215,"session":"REGULAR","venues":{"venue-a":183.4344,"venue-b":183.4344,"venue-c":183.4344,"offshore":183.4344}},{"ts":1793383200000,"fv":183.9442,"lo":178.2603,"hi":189.628,"session":"REGULAR","venues":{"venue-a":184.1157,"venue-b":184.1157,"venue-c":184.1157,"offshore":184.1121}},{"ts":1793386800000,"fv":184.5869,"lo":178.8832,"hi":190.2906,"session":"REGULAR","venues":{"venue-a":184.432,"venue-b":184.432,"venue-c":184.432,"offshore":184.4228}},{"ts":1793390400000,"fv":184.6109,"lo":174.9926,"hi":194.2291,"session":"EXTENDED","venues":{"venue-a":184.6971,"venue-b":184.6971,"venue-c":184.6971,"offshore":184.6969}},{"ts":1793394000000,"fv":184.8666,"lo":175.235,"hi":194.4981,"session":"EXTENDED","venues":{"venue-a":184.7833,"venue-b":184.7833,"venue-c":184.7833,"offshore":184.7833}},{"ts":1793397600000,"fv":184.3447,"lo":174.7403,"hi":193.9491,"session":"EXTENDED","venues":{"venue-a":184.4599,"venue-b":184.4599,"venue-c":184.4599,"offshore":184.4599}},{"ts":1793401200000,"fv":184.6242,"lo":175.0053,"hi":194.2431,"session":"EXTENDED","venues":{"venue-a":184.5363,"venue-b":184.5363,"venue-c":184.5363,"offshore":184.5363}},{"ts":1793404800000,"fv":184.2449,"lo":165.3414,"hi":203.1484,"session":"CLOSED","venues":{"venue-a":184.239,"venue-b":184.239,"venue-c":184.239,"offshore":184.239}},{"ts":1793408400000,"fv":184.2558,"lo":165.3512,"hi":203.1605,"session":"CLOSED","venues":{"venue-a":184.2512,"venue-b":184.2512,"venue-c":184.2512,"offshore":184.2512}},{"ts":1793412000000,"fv":184.2632,"lo":165.4868,"hi":203.0396,"session":"CLOSED","venues":{"venue-a":184.261,"venue-b":184.261,"venue-c":184.261,"offshore":184.261}},{"ts":1793415600000,"fv":184.2675,"lo":165.4907,"hi":203.0444,"session":"CLOSED","venues":{"venue-a":184.2657,"venue-b":184.2657,"venue-c":184.2657,"offshore":184.2657}},{"ts":1793419200000,"fv":184.2713,"lo":165.494,"hi":203.0485,"session":"CLOSED","venues":{"venue-a":184.2697,"venue-b":184.2697,"venue-c":184.2697,"offshore":184.2697}},{"ts":1793422800000,"fv":184.2757,"lo":165.369,"hi":203.1824,"session":"CLOSED","venues":{"venue-a":184.2732,"venue-b":184.2732,"venue-c":184.2732,"offshore":184.2668}},{"ts":1793426400000,"fv":184.2809,"lo":165.3737,"hi":203.1882,"session":"CLOSED","venues":{"venue-a":184.2787,"venue-b":184.2787,"venue-c":184.2787,"offshore":184.2786}},{"ts":1793430000000,"fv":184.2851,"lo":165.3775,"hi":203.1928,"session":"CLOSED","venues":{"venue-a":184.2832,"venue-b":184.2832,"venue-c":184.2832,"offshore":184.2832}},{"ts":1793433600000,"fv":184.2895,"lo":165.3814,"hi":203.1975,"session":"CLOSED","venues":{"venue-a":184.2877,"venue-b":184.2877,"venue-c":184.2877,"offshore":184.2877}},{"ts":1793437200000,"fv":184.2927,"lo":165.5132,"hi":203.0721,"session":"CLOSED","venues":{"venue-a":184.2917,"venue-b":184.2917,"venue-c":184.2917,"offshore":184.2917}},{"ts":1793440800000,"fv":184.2962,"lo":165.3874,"hi":203.205,"session":"CLOSED","venues":{"venue-a":184.2947,"venue-b":184.2947,"venue-c":184.2947,"offshore":184.2947}},{"ts":1793444400000,"fv":184.3013,"lo":165.392,"hi":203.2106,"session":"CLOSED","venues":{"venue-a":184.2999,"venue-b":184.2999,"venue-c":184.2999,"offshore":184.3005}},{"ts":1793448000000,"fv":184.3044,"lo":165.3948,"hi":203.2141,"session":"CLOSED","venues":{"venue-a":184.3031,"venue-b":184.3031,"venue-c":184.3031,"offshore":184.3031}},{"ts":1793451600000,"fv":184.3074,"lo":165.3974,"hi":203.2173,"session":"CLOSED","venues":{"venue-a":184.3061,"venue-b":184.3061,"venue-c":184.3061,"offshore":184.3061}},{"ts":1793455200000,"fv":184.3101,"lo":165.3999,"hi":203.2203,"session":"CLOSED","venues":{"venue-a":184.309,"venue-b":184.309,"venue-c":184.309,"offshore":184.309}},{"ts":1793458800000,"fv":184.3127,"lo":165.4022,"hi":203.2232,"session":"CLOSED","venues":{"venue-a":184.3116,"venue-b":184.3116,"venue-c":184.3116,"offshore":184.3116}},{"ts":1793462400000,"fv":184.3151,"lo":165.4044,"hi":203.2259,"session":"CLOSED","venues":{"venue-a":184.3141,"venue-b":184.3141,"venue-c":184.3141,"offshore":184.3141}},{"ts":1793466000000,"fv":184.3174,"lo":165.4065,"hi":203.2284,"session":"CLOSED","venues":{"venue-a":184.3165,"venue-b":184.3165,"venue-c":184.3165,"offshore":184.3169}},{"ts":1793469600000,"fv":184.3196,"lo":165.4084,"hi":203.2308,"session":"CLOSED","venues":{"venue-a":184.3187,"venue-b":184.3187,"venue-c":184.3187,"offshore":184.3187}},{"ts":1793473200000,"fv":184.3217,"lo":165.4103,"hi":203.2331,"session":"CLOSED","venues":{"venue-a":184.3209,"venue-b":184.3209,"venue-c":184.3209,"offshore":184.3209}},{"ts":1793476800000,"fv":184.3235,"lo":165.4119,"hi":203.2351,"session":"CLOSED","venues":{"venue-a":184.3227,"venue-b":184.3227,"venue-c":184.3227,"offshore":184.3227}},{"ts":1793480400000,"fv":184.3254,"lo":165.4136,"hi":203.2372,"session":"CLOSED","venues":{"venue-a":184.3246,"venue-b":184.3246,"venue-c":184.3246,"offshore":184.3246}},{"ts":1793484000000,"fv":184.3272,"lo":165.4153,"hi":203.2392,"session":"CLOSED","venues":{"venue-a":184.3265,"venue-b":184.3265,"venue-c":184.3265,"offshore":184.3283}},{"ts":1793487600000,"fv":184.329,"lo":165.4168,"hi":203.2411,"session":"CLOSED","venues":{"venue-a":184.3282,"venue-b":184.3282,"venue-c":184.3282,"offshore":184.3283}},{"ts":1793491200000,"fv":184.3305,"lo":165.4182,"hi":203.2428,"session":"CLOSED","venues":{"venue-a":184.3298,"venue-b":184.3298,"venue-c":184.3298,"offshore":184.3298}},{"ts":1793494800000,"fv":184.3319,"lo":165.4195,"hi":203.2444,"session":"CLOSED","venues":{"venue-a":184.3312,"venue-b":184.3312,"venue-c":184.3312,"offshore":184.3312}},{"ts":1793498400000,"fv":184.3335,"lo":165.4209,"hi":203.2461,"session":"CLOSED","venues":{"venue-a":184.3328,"venue-b":184.3328,"venue-c":184.3328,"offshore":184.3328}},{"ts":1793502000000,"fv":184.3348,"lo":165.4221,"hi":203.2476,"session":"CLOSED","venues":{"venue-a":184.3342,"venue-b":184.3342,"venue-c":184.3342,"offshore":184.3342}},{"ts":1793505600000,"fv":184.3361,"lo":165.4232,"hi":203.249,"session":"CLOSED","venues":{"venue-a":184.3355,"venue-b":184.3355,"venue-c":184.3355,"offshore":184.3355}},{"ts":1793509200000,"fv":184.3368,"lo":165.5529,"hi":203.1207,"session":"CLOSED","venues":{"venue-a":184.3364,"venue-b":184.3364,"venue-c":184.3364,"offshore":184.3364}},{"ts":1793512800000,"fv":184.3375,"lo":165.5535,"hi":203.1215,"session":"CLOSED","venues":{"venue-a":184.3372,"venue-b":184.3372,"venue-c":184.3372,"offshore":184.3372}},{"ts":1793516400000,"fv":184.3383,"lo":165.5542,"hi":203.1224,"session":"CLOSED","venues":{"venue-a":184.338,"venue-b":184.338,"venue-c":184.338,"offshore":184.338}},{"ts":1793520000000,"fv":184.339,"lo":165.5549,"hi":203.1231,"session":"CLOSED","venues":{"venue-a":184.3387,"venue-b":184.3387,"venue-c":184.3387,"offshore":184.3387}},{"ts":1793523600000,"fv":184.3397,"lo":165.5555,"hi":203.1239,"session":"CLOSED","venues":{"venue-a":184.3394,"venue-b":184.3394,"venue-c":184.3394,"offshore":184.3394}},{"ts":1793527200000,"fv":184.3404,"lo":165.5561,"hi":203.1247,"session":"CLOSED","venues":{"venue-a":184.3401,"venue-b":184.3401,"venue-c":184.3401,"offshore":184.3401}},{"ts":1793530800000,"fv":184.341,"lo":165.5567,"hi":203.1254,"session":"CLOSED","venues":{"venue-a":184.3408,"venue-b":184.3408,"venue-c":184.3408,"offshore":184.3408}},{"ts":1793534400000,"fv":184.3417,"lo":165.5573,"hi":203.1261,"session":"CLOSED","venues":{"venue-a":184.3414,"venue-b":184.3414,"venue-c":184.3414,"offshore":184.3414}},{"ts":1793538000000,"fv":184.3423,"lo":165.5578,"hi":203.1268,"session":"CLOSED","venues":{"venue-a":184.342,"venue-b":184.342,"venue-c":184.342,"offshore":184.342}},{"ts":1793541600000,"fv":184.3432,"lo":165.4296,"hi":203.2569,"session":"CLOSED","venues":{"venue-a":184.3428,"venue-b":184.3428,"venue-c":184.3428,"offshore":184.3389}},{"ts":1793545200000,"fv":184.3441,"lo":165.5595,"hi":203.1288,"session":"CLOSED","venues":{"venue-a":184.3439,"venue-b":184.3439,"venue-c":184.3439,"offshore":184.3439}},{"ts":1793548800000,"fv":184.3452,"lo":165.4314,"hi":203.259,"session":"CLOSED","venues":{"venue-a":184.3448,"venue-b":184.3448,"venue-c":184.3448,"offshore":184.3448}},{"ts":1793552400000,"fv":184.3462,"lo":165.4323,"hi":203.2602,"session":"CLOSED","venues":{"venue-a":184.3458,"venue-b":184.3458,"venue-c":184.3458,"offshore":184.3458}},{"ts":1793556000000,"fv":184.3472,"lo":165.4332,"hi":203.2612,"session":"CLOSED","venues":{"venue-a":184.3468,"venue-b":184.3468,"venue-c":184.3468,"offshore":184.3468}},{"ts":1793559600000,"fv":184.3482,"lo":165.4341,"hi":203.2623,"session":"CLOSED","venues":{"venue-a":184.3478,"venue-b":184.3478,"venue-c":184.3478,"offshore":184.3478}},{"ts":1793563200000,"fv":184.349,"lo":165.4348,"hi":203.2632,"session":"CLOSED","venues":{"venue-a":184.3486,"venue-b":184.3486,"venue-c":184.3486,"offshore":184.3486}},{"ts":1793566800000,"fv":184.3497,"lo":165.5644,"hi":203.1349,"session":"CLOSED","venues":{"venue-a":184.3494,"venue-b":184.3494,"venue-c":184.3494,"offshore":184.3494}},{"ts":1793570400000,"fv":184.3502,"lo":165.5649,"hi":203.1354,"session":"CLOSED","venues":{"venue-a":184.3499,"venue-b":184.3499,"venue-c":184.3499,"offshore":184.3499}},{"ts":1793574000000,"fv":184.3461,"lo":165.5612,"hi":203.1309,"session":"CLOSED","venues":{"venue-a":184.3504,"venue-b":184.3504,"venue-c":184.3504,"offshore":184.3504}},{"ts":1793577600000,"fv":184.3325,"lo":165.42,"hi":203.245,"session":"CLOSED","venues":{"venue-a":184.3401,"venue-b":184.3401,"venue-c":184.3401,"offshore":184.3483}},{"ts":1793581200000,"fv":184.3147,"lo":170.9334,"hi":197.6959,"session":"OVERNIGHT","venues":{"venue-a":184.3221,"venue-b":184.3221,"venue-c":184.3221,"offshore":184.3178}},{"ts":1793584800000,"fv":184.2972,"lo":170.9172,"hi":197.6772,"session":"OVERNIGHT","venues":{"venue-a":184.3045,"venue-b":184.3045,"venue-c":184.3045,"offshore":184.3044}},{"ts":1793588400000,"fv":184.282,"lo":170.9031,"hi":197.6609,"session":"OVERNIGHT","venues":{"venue-a":184.2891,"venue-b":184.2891,"venue-c":184.2891,"offshore":184.2891}},{"ts":1793592000000,"fv":184.269,"lo":170.8911,"hi":197.6469,"session":"OVERNIGHT","venues":{"venue-a":184.276,"venue-b":184.276,"venue-c":184.276,"offshore":184.276}},{"ts":1793595600000,"fv":184.2526,"lo":170.8759,"hi":197.6293,"session":"OVERNIGHT","venues":{"venue-a":184.2594,"venue-b":184.2594,"venue-c":184.2594,"offshore":184.2594}},{"ts":1793599200000,"fv":184.2365,"lo":170.861,"hi":197.6121,"session":"OVERNIGHT","venues":{"venue-a":184.2432,"venue-b":184.2432,"venue-c":184.2432,"offshore":184.2432}},{"ts":1793602800000,"fv":184.2208,"lo":170.8464,"hi":197.5952,"session":"OVERNIGHT","venues":{"venue-a":184.2273,"venue-b":184.2273,"venue-c":184.2273,"offshore":184.2273}},{"ts":1793606400000,"fv":184.2082,"lo":170.9636,"hi":197.4527,"session":"OVERNIGHT","venues":{"venue-a":184.2118,"venue-b":184.2118,"venue-c":184.2118,"offshore":184.2118}},{"ts":1793610000000,"fv":183.8763,"lo":174.3699,"hi":193.3827,"session":"EXTENDED","venues":{"venue-a":184.0722,"venue-b":184.0722,"venue-c":184.0722,"offshore":184.0722}},{"ts":1793613600000,"fv":183.8533,"lo":174.3481,"hi":193.3586,"session":"EXTENDED","venues":{"venue-a":183.9276,"venue-b":183.9276,"venue-c":183.9276,"offshore":183.9276}},{"ts":1793617200000,"fv":183.6649,"lo":174.0959,"hi":193.2338,"session":"EXTENDED","venues":{"venue-a":183.7113,"venue-b":183.7113,"venue-c":183.7113,"offshore":183.7051}},{"ts":1793620800000,"fv":182.9365,"lo":173.4055,"hi":192.4675,"session":"EXTENDED","venues":{"venue-a":183.1541,"venue-b":183.1541,"venue-c":183.1541,"offshore":183.1539}},{"ts":1793624400000,"fv":182.0679,"lo":172.5822,"hi":191.5536,"session":"EXTENDED","venues":{"venue-a":182.3452,"venue-b":182.3452,"venue-c":182.3452,"offshore":182.3452}},{"ts":1793628000000,"fv":180.4891,"lo":171.0856,"hi":189.8926,"session":"EXTENDED","venues":{"venue-a":181.02,"venue-b":181.02,"venue-c":181.02,"offshore":181.02}},{"ts":1793631600000,"fv":179.442,"lo":173.8972,"hi":184.9867,"session":"REGULAR","venues":{"venue-a":179.7656,"venue-b":179.7656,"venue-c":179.7656,"offshore":179.7656}}],"TSLA":[{"ts":1793001600000,"fv":429.674,"lo":407.4599,"hi":451.8882,"session":"EXTENDED","venues":{"venue-a":429.8681,"venue-b":429.8681,"venue-c":429.8681,"offshore":429.8681}},{"ts":1793005200000,"fv":432.3953,"lo":409.8675,"hi":454.9231,"session":"EXTENDED","venues":{"venue-a":431.4405,"venue-b":431.4405,"venue-c":431.4405,"offshore":431.4392}},{"ts":1793008800000,"fv":434.1602,"lo":411.5404,"hi":456.7799,"session":"EXTENDED","venues":{"venue-a":433.1675,"venue-b":433.1675,"venue-c":433.1675,"offshore":433.1674}},{"ts":1793012400000,"fv":434.4075,"lo":411.7749,"hi":457.0401,"session":"EXTENDED","venues":{"venue-a":434.1703,"venue-b":434.1703,"venue-c":434.1703,"offshore":434.1703}},{"ts":1793016000000,"fv":437.756,"lo":415.0364,"hi":460.4755,"session":"EXTENDED","venues":{"venue-a":436.718,"venue-b":436.6892,"venue-c":436.6892,"offshore":436.6892}},{"ts":1793019600000,"fv":437.067,"lo":414.3832,"hi":459.7508,"session":"EXTENDED","venues":{"venue-a":436.9763,"venue-b":436.9756,"venue-c":436.9756,"offshore":436.9756}},{"ts":1793023200000,"fv":434.8186,"lo":421.3827,"hi":448.2545,"session":"REGULAR","venues":{"venue-a":434.6213,"venue-b":434.6297,"venue-c":434.6297,"offshore":434.6297}},{"ts":1793026800000,"fv":432.6681,"lo":419.2986,"hi":446.0375,"session":"REGULAR","venues":{"venue-a":433.337,"venue-b":433.3422,"venue-c":433.3422,"offshore":433.3422}},{"ts":1793030400000,"fv":432.3196,"lo":418.9609,"hi":445.6783,"session":"REGULAR","venues":{"venue-a":432.4353,"venue-b":432.4272,"venue-c":432.4272,"offshore":432.4272}},{"ts":1793034000000,"fv":431.3579,"lo":418.0289,"hi":444.6869,"session":"REGULAR","venues":{"venue-a":431.8041,"venue-b":431.8005,"venue-c":431.8005,"offshore":431.8005}},{"ts":1793037600000,"fv":427.3854,"lo":414.1792,"hi":440.5916,"session":"REGULAR","venues":{"venue-a":427.9931,"venue-b":428.0012,"venue-c":428.0012,"offshore":428.0012}},{"ts":1793041200000,"fv":426.3476,"lo":413.1735,"hi":439.5217,"session":"REGULAR","venues":{"venue-a":426.8266,"venue-b":426.8602,"venue-c":426.8602,"offshore":426.8602}},{"ts":1793044800000,"fv":428.3697,"lo":406.1373,"hi":450.6021,"session":"EXTENDED","venues":{"venue-a":428.4738,"venue-b":428.4669,"venue-c":428.4669,"offshore":428.4661}},{"ts":1793048400000,"fv":428.1603,"lo":405.9388,"hi":450.3818,"session":"EXTENDED","venues":{"venue-a":428.321,"venue-b":428.3202,"venue-c":428.3202,"offshore":428.3202}},{"ts":1793052000000,"fv":427.4674,"lo":405.2818,"hi":449.653,"session":"EXTENDED","venues":{"venue-a":427.7214,"venue-b":427.7214,"venue-c":427.7214,"offshore":427.7214}},{"ts":1793055600000,"fv":426.5876,"lo":404.4477,"hi":448.7275,"session":"EXTENDED","venues":{"venue-a":427.033,"venue-b":427.033,"venue-c":427.033,"offshore":427.033}},{"ts":1793059200000,"fv":426.0834,"lo":395.1497,"hi":457.0171,"session":"OVERNIGHT","venues":{"venue-a":426.0605,"venue-b":426.0605,"venue-c":426.0605,"offshore":426.0625}},{"ts":1793062800000,"fv":426.1261,"lo":395.1894,"hi":457.0629,"session":"OVERNIGHT","venues":{"venue-a":426.108,"venue-b":426.108,"venue-c":426.108,"offshore":426.1081}},{"ts":1793066400000,"fv":426.1537,"lo":395.3428,"hi":456.9646,"session":"OVERNIGHT","venues":{"venue-a":426.1388,"venue-b":426.1423,"venue-c":426.1423,"offshore":426.1423}},{"ts":1793070000000,"fv":426.1768,"lo":395.3642,"hi":456.9893,"session":"OVERNIGHT","venues":{"venue-a":426.167,"venue-b":426.1671,"venue-c":426.1671,"offshore":426.1671}},{"ts":1793073600000,"fv":426.1969,"lo":395.3828,"hi":457.0109,"session":"OVERNIGHT","venues":{"venue-a":426.1852,"venue-b":426.1884,"venue-c":426.1884,"offshore":426.1884}},{"ts":1793077200000,"fv":426.2147,"lo":395.3994,"hi":457.03,"session":"OVERNIGHT","venues":{"venue-a":426.202,"venue-b":426.2072,"venue-c":426.2072,"offshore":426.2072}},{"ts":1793080800000,"fv":426.2307,"lo":395.4142,"hi":457.0471,"session":"OVERNIGHT","venues":{"venue-a":426.258,"venue-b":426.224,"venue-c":426.224,"offshore":426.224}},{"ts":1793084400000,"fv":426.2445,"lo":395.427,"hi":457.062,"session":"OVERNIGHT","venues":{"venue-a":426.2397,"venue-b":426.2385,"venue-c":426.2385,"offshore":426.2385}},{"ts":1793088000000,"fv":425.3723,"lo":403.2955,"hi":447.4491,"session":"EXTENDED","venues":{"venue-a":425.9677,"venue-b":425.9294,"venue-c":425.9294,"offshore":425.9294}},{"ts":1793091600000,"fv":423.8788,"lo":401.8795,"hi":445.8781,"session":"EXTENDED","venues":{"venue-a":424.2589,"venue-b":424.2579,"venue-c":424.2579,"offshore":424.2579}},{"ts":1793095200000,"fv":422.2162,"lo":400.3031,"hi":444.1292,"session":"EXTENDED","venues":{"venue-a":422.7419,"venue-b":422.7419,"venue-c":422.7419,"offshore":422.7419}},{"ts":1793098800000,"fv":421.3289,"lo":399.3777,"hi":443.2802,"session":"EXTENDED","venues":{"venue-a":421.702,"venue-b":421.702,"venue-c":421.702,"offshore":421.7061}},{"ts":1793102400000,"fv":420.7498,"lo":398.9129,"hi":442.5867,"session":"EXTENDED","venues":{"venue-a":420.7339,"venue-b":420.7672,"venue-c":420.7672,"offshore":420.7673}},{"ts":1793106000000,"fv":421.8833,"lo":399.9875,"hi":443.779,"session":"EXTENDED","venues":{"venue-a":421.5283,"venue-b":421.5291,"venue-c":421.5291,"offshore":421.5291}},{"ts":1793109600000,"fv":422.263,"lo":409.2151,"hi":435.3109,"session":"REGULAR","venues":{"venue-a":422.2119,"venue-b":422.2119,"venue-c":422.2119,"offshore":422.2147}},{"ts":1793113200000,"fv":422.0999,"lo":409.057,"hi":435.1428,"session":"REGULAR","venues":{"venue-a":422.5524,"venue-b":422.5524,"venue-c":422.5524,"offshore":422.5449}},{"ts":1793116800000,"fv":424.9848,"lo":411.8528,"hi":438.1169,"session":"REGULAR","venues":{"venue-a":424.4745,"venue-b":424.4756,"venue-c":424.4756,"offshore":424.4799}},{"ts":1793120400000,"fv":422.9492,"lo":409.8801,"hi":436.0184,"session":"REGULAR","venues":{"venue-a":422.9516,"venue-b":422.9559,"venue-c":422.9559,"offshore":422.956}},{"ts":1793124000000,"fv":423.3515,"lo":410.2699,"hi":436.433,"session":"REGULAR","venues":{"venue-a":422.883,"venue-b":422.8807,"venue-c":422.8807,"offshore":422.8723}},{"ts":1793127600000,"fv":424.1684,"lo":411.0616,"hi":437.2752,"session":"REGULAR","venues":{"venue-a":424.0477,"venue-b":424.0103,"venue-c":424.0103,"offshore":424.0101}},{"ts":1793131200000,"fv":422.7559,"lo":400.8149,"hi":444.697,"session":"EXTENDED","venues":{"venue-a":422.9441,"venue-b":422.9577,"venue-c":422.9577,"offshore":422.9577}},{"ts":1793134800000,"fv":421.6684,"lo":399.7838,"hi":443.553,"session":"EXTENDED","venues":{"venue-a":422.2804,"venue-b":422.2561,"venue-c":422.2561,"offshore":422.2561}},{"ts":1793138400000,"fv":419.6178,"lo":397.8396,"hi":441.3959,"session":"EXTENDED","venues":{"venue-a":420.2809,"venue-b":420.2802,"venue-c":420.2802,"offshore":420.2802}},{"ts":1793142000000,"fv":420.3511,"lo":398.5349,"hi":442.1674,"session":"EXTENDED","venues":{"venue-a":420.366,"venue-b":420.366,"venue-c":420.366,"offshore":420.366}},{"ts":1793145600000,"fv":420.2098,"lo":389.8286,"hi":450.591,"session":"OVERNIGHT","venues":{"venue-a":420.1969,"venue-b":420.1969,"venue-c":420.1969,"offshore":420.1969}},{"ts":1793149200000,"fv":420.2339,"lo":389.851,"hi":450.6168,"session":"OVERNIGHT","venues":{"venue-a":420.2738,"venue-b":420.2237,"venue-c":420.2237,"offshore":420.2237}},{"ts":1793152800000,"fv":420.2539,"lo":389.8696,"hi":450.6383,"session":"OVERNIGHT","venues":{"venue-a":420.2489,"venue-b":420.2455,"venue-c":420.2455,"offshore":420.2455}},{"ts":1793156400000,"fv":420.2699,"lo":389.8844,"hi":450.6554,"session":"OVERNIGHT","venues":{"venue-a":420.2628,"venue-b":420.2627,"venue-c":420.2627,"offshore":420.2627}},{"ts":1793160000000,"fv":420.2832,"lo":390.0648,"hi":450.5015,"session":"OVERNIGHT","venues":{"venue-a":420.2786,"venue-b":420.2786,"venue-c":420.2786,"offshore":420.2786}},{"ts":1793163600000,"fv":420.2952,"lo":389.9079,"hi":450.6826,"session":"OVERNIGHT","venues":{"venue-a":420.2396,"venue-b":420.2897,"venue-c":420.2897,"offshore":420.2897}},{"ts":1793167200000,"fv":420.3071,"lo":389.9189,"hi":450.6953,"session":"OVERNIGHT","venues":{"venue-a":420.3377,"venue-b":420.3021,"venue-c":420.3021,"offshore":420.3021}},{"ts":1793170800000,"fv":420.3178,"lo":389.9288,"hi":450.7068,"session":"OVERNIGHT","venues":{"venue-a":420.3142,"venue-b":420.3133,"venue-c":420.3133,"offshore":420.3133}},{"ts":1793174400000,"fv":419.4346,"lo":397.6659,"hi":441.2032,"session":"EXTENDED","venues":{"venue-a":419.9523,"venue-b":419.9566,"venue-c":419.9566,"offshore":419.9566}},{"ts":1793178000000,"fv":419.7713,"lo":397.9852,"hi":441.5575,"session":"EXTENDED","venues":{"venue-a":419.4936,"venue-b":419.4937,"venue-c":419.4937,"offshore":419.4937}},{"ts":1793181600000,"fv":419.3156,"lo":397.5532,"hi":441.0781,"session":"EXTENDED","venues":{"venue-a":419.1837,"venue-b":419.1671,"venue-c":419.1671,"offshore":419.1695}},{"ts":1793185200000,"fv":420.257,"lo":398.4456,"hi":442.0683,"session":"EXTENDED","venues":{"venue-a":420.0473,"venue-b":420.0622,"venue-c":420.0622,"offshore":420.0623}},{"ts":1793188800000,"fv":418.6016,"lo":396.8762,"hi":440.327,"session":"EXTENDED","venues":{"venue-a":419.0729,"venue-b":419.0733,"venue-c":419.0733,"offshore":419.0733}},{"ts":1793192400000,"fv":418.566,"lo":396.8424,"hi":440.2896,"session":"EXTENDED","venues":{"venue-a":418.7052,"venue-b":418.7052,"venue-c":418.7052,"offshore":418.7052}},{"ts":1793196000000,"fv":420.7813,"lo":407.7792,"hi":433.7835,"session":"REGULAR","venues":{"venue-a":419.9474,"venue-b":419.9161,"venue-c":419.9161,"offshore":419.9161}},{"ts":1793199600000,"fv":418.8599,"lo":405.9171,"hi":431.8026,"session":"REGULAR","venues":{"venue-a":419.4848,"venue-b":419.4799,"venue-c":419.4799,"offshore":419.4799}},{"ts":1793203200000,"fv":421.955,"lo":408.9166,"hi":434.9934,"session":"REGULAR","venues":{"venue-a":421.3329,"venue-b":421.3311,"venue-c":421.3311,"offshore":421.3311}},{"ts":1793206800000,"fv":419.6261,"lo":406.6596,"hi":432.5925,"session":"REGULAR","venues":{"venue-a":419.7042,"venue-b":419.7041,"venue-c":419.7041,"offshore":419.7041}},{"ts":1793210400000,"fv":420.0787,"lo":407.0982,"hi":433.0591,"session":"REGULAR","venues":{"venue-a":419.7386,"venue-b":419.7786,"venue-c":419.7786,"offshore":419.7786}},{"ts":1793214000000,"fv":419.1079,"lo":406.1575,"hi":432.0584,"session":"REGULAR","venues":{"venue-a":419.0976,"venue-b":419.1063,"venue-c":419.1063,"offshore":419.1063}},{"ts":1793217600000,"fv":419.7612,"lo":397.9756,"hi":441.5469,"session":"EXTENDED","venues":{"venue-a":419.9821,"venue-b":419.9678,"venue-c":419.9678,"offshore":419.9678}},{"ts":1793221200000,"fv":420.9376,"lo":399.0909,"hi":442.7842,"session":"EXTENDED","venues":{"venue-a":420.7467,"venue-b":420.7446,"venue-c":420.7446,"offshore":420.7446}},{"ts":1793224800000,"fv":421.5914,"lo":399.7108,"hi":443.472,"session":"EXTENDED","venues":{"venue-a":421.2568,"venue-b":421.2568,"venue-c":421.2568,"offshore":421.2568}},{"ts":1793228400000,"fv":421.7258,"lo":399.8382,"hi":443.6134,"session":"EXTENDED","venues":{"venue-a":421.5437,"venue-b":421.5437,"venue-c":421.5437,"offshore":421.5437}},{"ts":1793232000000,"fv":421.5998,"lo":391.1181,"hi":452.0815,"session":"OVERNIGHT","venues":{"venue-a":421.5972,"venue-b":421.6049,"venue-c":421.6049,"offshore":421.6049}},{"ts":1793235600000,"fv":421.5903,"lo":391.1093,"hi":452.0713,"session":"OVERNIGHT","venues":{"venue-a":421.5941,"venue-b":421.5943,"venue-c":421.5943,"offshore":421.5943}},{"ts":1793239200000,"fv":421.5825,"lo":391.102,"hi":452.0629,"session":"OVERNIGHT","venues":{"venue-a":421.5858,"venue-b":421.5858,"venue-c":421.5858,"offshore":421.5858}},{"ts":1793242800000,"fv":421.5757,"lo":391.0958,"hi":452.0557,"session":"OVERNIGHT","venues":{"venue-a":421.5813,"venue-b":421.5786,"venue-c":421.5786,"offshore":421.5786}},{"ts":1793246400000,"fv":421.5699,"lo":391.0904,"hi":452.0494,"session":"OVERNIGHT","venues":{"venue-a":421.5744,"venue-b":421.5723,"venue-c":421.5723,"offshore":421.5723}},{"ts":1793250000000,"fv":421.5647,"lo":391.0856,"hi":452.0438,"session":"OVERNIGHT","venues":{"venue-a":421.6151,"venue-b":421.5669,"venue-c":421.5669,"offshore":421.5669}},{"ts":1793253600000,"fv":421.5601,"lo":391.0813,"hi":452.0389,"session":"OVERNIGHT","venues":{"venue-a":421.5632,"venue-b":421.562,"venue-c":421.562,"offshore":421.562}},{"ts":1793257200000,"fv":421.5559,"lo":391.0774,"hi":452.0343,"session":"OVERNIGHT","venues":{"venue-a":421.5576,"venue-b":421.5576,"venue-c":421.5576,"offshore":421.5576}},{"ts":1793260800000,"fv":420.7113,"lo":398.8764,"hi":442.5462,"session":"EXTENDED","venues":{"venue-a":421.2079,"venue-b":421.2079,"venue-c":421.2079,"offshore":421.2079}},{"ts":1793264400000,"fv":421.8421,"lo":399.9485,"hi":443.7357,"session":"EXTENDED","venues":{"venue-a":421.4919,"venue-b":421.4839,"venue-c":421.4839,"offshore":421.4839}},{"ts":1793268000000,"fv":421.3814,"lo":399.5117,"hi":443.2511,"session":"EXTENDED","venues":{"venue-a":421.7259,"venue-b":421.7256,"venue-c":421.7256,"offshore":421.7256}},{"ts":1793271600000,"fv":421.0046,"lo":399.1545,"hi":442.8548,"session":"EXTENDED","venues":{"venue-a":421.2449,"venue-b":421.2449,"venue-c":421.2449,"offshore":421.2449}},{"ts":1793275200000,"fv":421.9992,"lo":400.0975,"hi":443.901,"session":"EXTENDED","venues":{"venue-a":421.9949,"venue-b":421.9949,"venue-c":421.9949,"offshore":421.9949}},{"ts":1793278800000,"fv":424.1999,"lo":402.184,"hi":446.2159,"session":"EXTENDED","venues":{"venue-a":423.4434,"venue-b":423.4246,"venue-c":423.4246,"offshore":423.4246}},{"ts":1793282400000,"fv":426.7927,"lo":413.6048,"hi":439.9806,"session":"REGULAR","venues":{"venue-a":426.0045,"venue-b":426.0114,"venue-c":426.0114,"offshore":426.0143}},{"ts":1793286000000,"fv":432.7382,"lo":419.3666,"hi":446.1098,"session":"REGULAR","venues":{"venue-a":431.4387,"venue-b":431.4389,"venue-c":431.4389,"offshore":431.4376}},{"ts":1793289600000,"fv":436.0617,"lo":422.5874,"hi":449.536,"session":"REGULAR","venues":{"venue-a":435.5576,"venue-b":435.5155,"venue-c":435.5155,"offshore":435.5155}},{"ts":1793293200000,"fv":436.2084,"lo":422.7296,"hi":449.6873,"session":"REGULAR","venues":{"venue-a":436.0758,"venue-b":436.0747,"venue-c":436.0747,"offshore":436.0747}},{"ts":1793296800000,"fv":437.8665,"lo":424.3364,"hi":451.3965,"session":"REGULAR","venues":{"venue-a":437.1565,"venue-b":437.1728,"venue-c":437.1728,"offshore":437.1575}},{"ts":1793300400000,"fv":436.8746,"lo":423.3752,"hi":450.374,"session":"REGULAR","venues":{"venue-a":437.3562,"venue-b":437.3559,"venue-c":437.3559,"offshore":437.3555}},{"ts":1793304000000,"fv":441.6513,"lo":418.6413,"hi":464.6614,"session":"EXTENDED","venues":{"venue-a":441.0773,"venue-b":441.0773,"venue-c":441.0773,"offshore":441.0776}},{"ts":1793307600000,"fv":440.8366,"lo":417.869,"hi":463.8042,"session":"EXTENDED","venues":{"venue-a":441.308,"venue-b":441.308,"venue-c":441.308,"offshore":441.308}},{"ts":1793311200000,"fv":441.6363,"lo":418.7154,"hi":464.5572,"session":"EXTENDED","venues":{"venue-a":441.4666,"venue-b":441.4487,"venue-c":441.4487,"offshore":441.4487}},{"ts":1793314800000,"fv":441.703,"lo":418.7787,"hi":464.6274,"session":"EXTENDED","venues":{"venue-a":441.6527,"venue-b":441.7003,"venue-c":441.7003,"offshore":441.7009}},{"ts":1793318400000,"fv":441.7515,"lo":409.857,"hi":473.6459,"session":"OVERNIGHT","venues":{"venue-a":441.741,"venue-b":441.7492,"venue-c":441.7492,"offshore":441.7492}},{"ts":1793322000000,"fv":441.7557,"lo":409.861,"hi":473.6505,"session":"OVERNIGHT","venues":{"venue-a":441.7542,"venue-b":441.7539,"venue-c":441.7539,"offshore":441.7539}},{"ts":1793325600000,"fv":441.7592,"lo":409.8642,"hi":473.6543,"session":"OVERNIGHT","venues":{"venue-a":441.7578,"venue-b":441.7578,"venue-c":441.7578,"offshore":441.7578}},{"ts":1793329200000,"fv":441.7623,"lo":409.867,"hi":473.6575,"session":"OVERNIGHT","venues":{"venue-a":441.761,"venue-b":441.761,"venue-c":441.761,"offshore":441.761}},{"ts":1793332800000,"fv":441.7649,"lo":409.8694,"hi":473.6603,"session":"OVERNIGHT","venues":{"venue-a":441.7638,"venue-b":441.7638,"venue-c":441.7638,"offshore":441.7638}},{"ts":1793336400000,"fv":441.7669,"lo":410.0039,"hi":473.53,"session":"OVERNIGHT","venues":{"venue-a":441.7662,"venue-b":441.7662,"venue-c":441.7662,"offshore":441.7662}},{"ts":1793340000000,"fv":441.7691,"lo":409.8734,"hi":473.6649,"session":"OVERNIGHT","venues":{"venue-a":441.7683,"venue-b":441.7683,"venue-c":441.7683,"offshore":441.7683}},{"ts":1793343600000,"fv":441.771,"lo":409.8751,"hi":473.6669,"session":"OVERNIGHT","venues":{"venue-a":441.7785,"venue-b":441.7702,"venue-c":441.7702,"offshore":441.7702}},{"ts":1793347200000,"fv":442.9524,"lo":419.9632,"hi":465.9417,"session":"EXTENDED","venues":{"venue-a":442.2885,"venue-b":442.2563,"venue-c":442.2563,"offshore":442.2563}},{"ts":1793350800000,"fv":443.4867,"lo":420.4698,"hi":466.5037,"session":"EXTENDED","venues":{"venue-a":443.3781,"venue-b":443.3773,"venue-c":443.3773,"offshore":443.3773}},{"ts":1793354400000,"fv":443.8878,"lo":420.85,"hi":466.9256,"session":"EXTENDED","venues":{"venue-a":443.9078,"venue-b":443.9078,"venue-c":443.9078,"offshore":443.9078}},{"ts":1793358000000,"fv":445.6404,"lo":422.4225,"hi":468.8583,"session":"EXTENDED","venues":{"venue-a":445.1182,"venue-b":445.1182,"venue-c":445.1182,"offshore":445.0951}},{"ts":1793361600000,"fv":446.3645,"lo":423.1089,"hi":469.6201,"session":"EXTENDED","venues":{"venue-a":446.0461,"venue-b":446.0492,"venue-c":446.0492,"offshore":446.0613}},{"ts":1793365200000,"fv":447.7337,"lo":424.4963,"hi":470.9711,"session":"EXTENDED","venues":{"venue-a":447.1625,"venue-b":447.1564,"venue-c":447.1564,"offshore":447.1567}},{"ts":1793368800000,"fv":450.5059,"lo":436.5853,"hi":464.4266,"session":"REGULAR","venues":{"venue-a":449.9472,"venue-b":449.9279,"venue-c":449.9279,"offshore":449.9279}},{"ts":1793372400000,"fv":450.1337,"lo":436.2246,"hi":464.0429,"session":"REGULAR","venues":{"venue-a":450.2484,"venue-b":450.2452,"venue-c":450.2452,"offshore":450.2452}},{"ts":1793376000000,"fv":452.9046,"lo":438.9099,"hi":466.8994,"session":"REGULAR","venues":{"venue-a":452.5549,"venue-b":452.5548,"venue-c":452.5548,"offshore":452.5337}},{"ts":1793379600000,"fv":448.2624,"lo":434.4111,"hi":462.1137,"session":"REGULAR","venues":{"venue-a":449.1639,"venue-b":449.1651,"venue-c":449.1651,"offshore":449.1646}},{"ts":1793383200000,"fv":449.4487,"lo":435.5607,"hi":463.3367,"session":"REGULAR","venues":{"venue-a":449.5049,"venue-b":449.5012,"venue-c":449.5012,"offshore":449.5012}},{"ts":1793386800000,"fv":446.9649,"lo":433.1537,"hi":460.7762,"session":"REGULAR","venues":{"venue-a":447.2079,"venue-b":447.2098,"venue-c":447.2098,"offshore":447.2088}},{"ts":1793390400000,"fv":447.8602,"lo":424.6163,"hi":471.1042,"session":"EXTENDED","venues":{"venue-a":447.9916,"venue-b":447.962,"venue-c":447.962,"offshore":447.962}},{"ts":1793394000000,"fv":447.7758,"lo":424.5363,"hi":471.0154,"session":"EXTENDED","venues":{"venue-a":447.517,"venue-b":447.5163,"venue-c":447.5163,"offshore":447.5163}},{"ts":1793397600000,"fv":448.1147,"lo":424.8576,"hi":471.3719,"session":"EXTENDED","venues":{"venue-a":448.2236,"venue-b":448.2236,"venue-c":448.2236,"offshore":448.2236}},{"ts":1793401200000,"fv":447.9884,"lo":424.7378,"hi":471.239,"session":"EXTENDED","venues":{"venue-a":447.738,"venue-b":447.738,"venue-c":447.738,"offshore":447.738}},{"ts":1793404800000,"fv":448.784,"lo":402.9183,"hi":494.6498,"session":"CLOSED","venues":{"venue-a":448.7886,"venue-b":448.7886,"venue-c":448.7886,"offshore":448.7886}},{"ts":1793408400000,"fv":448.7756,"lo":402.9107,"hi":494.6404,"session":"CLOSED","venues":{"venue-a":448.7746,"venue-b":448.7792,"venue-c":448.7792,"offshore":448.7792}},{"ts":1793412000000,"fv":448.7629,"lo":402.8993,"hi":494.6264,"session":"CLOSED","venues":{"venue-a":448.7694,"venue-b":448.7658,"venue-c":448.7658,"offshore":448.7658}},{"ts":1793415600000,"fv":448.7569,"lo":402.8939,"hi":494.6199,"session":"CLOSED","venues":{"venue-a":448.7595,"venue-b":448.7594,"venue-c":448.7594,"offshore":448.7594}},{"ts":1793419200000,"fv":448.751,"lo":402.7092,"hi":494.7929,"session":"CLOSED","venues":{"venue-a":448.7539,"venue-b":448.7539,"venue-c":448.7539,"offshore":448.7599}},{"ts":1793422800000,"fv":448.745,"lo":402.7037,"hi":494.7862,"session":"CLOSED","venues":{"venue-a":448.7475,"venue-b":448.7475,"venue-c":448.7475,"offshore":448.7477}},{"ts":1793426400000,"fv":448.7408,"lo":402.8795,"hi":494.6021,"session":"CLOSED","venues":{"venue-a":448.7489,"venue-b":448.7425,"venue-c":448.7425,"offshore":448.7425}},{"ts":1793430000000,"fv":448.737,"lo":402.8761,"hi":494.598,"session":"CLOSED","venues":{"venue-a":448.7388,"venue-b":448.7386,"venue-c":448.7386,"offshore":448.7386}},{"ts":1793433600000,"fv":448.7336,"lo":402.873,"hi":494.5942,"session":"CLOSED","venues":{"venue-a":448.7351,"venue-b":448.7351,"venue-c":448.7351,"offshore":448.7351}},{"ts":1793437200000,"fv":448.7305,"lo":402.8702,"hi":494.5907,"session":"CLOSED","venues":{"venue-a":448.7318,"venue-b":448.7318,"venue-c":448.7318,"offshore":448.7318}},{"ts":1793440800000,"fv":448.7276,"lo":402.8676,"hi":494.5875,"session":"CLOSED","venues":{"venue-a":448.7332,"venue-b":448.7288,"venue-c":448.7288,"offshore":448.7288}},{"ts":1793444400000,"fv":448.7252,"lo":403.0001,"hi":494.4503,"session":"CLOSED","venues":{"venue-a":448.7261,"venue-b":448.726,"venue-c":448.726,"offshore":448.726}},{"ts":1793448000000,"fv":448.7225,"lo":402.8631,"hi":494.582,"session":"CLOSED","venues":{"venue-a":448.7236,"venue-b":448.7236,"venue-c":448.7236,"offshore":448.7236}},{"ts":1793451600000,"fv":448.7202,"lo":402.861,"hi":494.5794,"session":"CLOSED","venues":{"venue-a":448.7211,"venue-b":448.7211,"venue-c":448.7211,"offshore":448.7211}},{"ts":1793455200000,"fv":448.7179,"lo":402.8589,"hi":494.5769,"session":"CLOSED","venues":{"venue-a":448.7267,"venue-b":448.7189,"venue-c":448.7189,"offshore":448.7189}},{"ts":1793458800000,"fv":448.7158,"lo":402.857,"hi":494.5746,"session":"CLOSED","venues":{"venue-a":448.7169,"venue-b":448.7167,"venue-c":448.7167,"offshore":448.7167}},{"ts":1793462400000,"fv":448.7134,"lo":402.6754,"hi":494.7514,"session":"CLOSED","venues":{"venue-a":448.7145,"venue-b":448.7145,"venue-c":448.7145,"offshore":448.718}},{"ts":1793466000000,"fv":448.7109,"lo":402.6731,"hi":494.7486,"session":"CLOSED","venues":{"venue-a":448.7119,"venue-b":448.7119,"venue-c":448.7119,"offshore":448.712}},{"ts":1793469600000,"fv":448.7092,"lo":402.8511,"hi":494.5673,"session":"CLOSED","venues":{"venue-a":448.7067,"venue-b":448.7099,"venue-c":448.7099,"offshore":448.7099}},{"ts":1793473200000,"fv":448.7075,"lo":402.8496,"hi":494.5654,"session":"CLOSED","venues":{"venue-a":448.7081,"venue-b":448.7082,"venue-c":448.7082,"offshore":448.7082}},{"ts":1793476800000,"fv":448.7058,"lo":402.8481,"hi":494.5635,"session":"CLOSED","venues":{"venue-a":448.7065,"venue-b":448.7065,"venue-c":448.7065,"offshore":448.7065}},{"ts":1793480400000,"fv":448.7042,"lo":402.8466,"hi":494.5618,"session":"CLOSED","venues":{"venue-a":448.7049,"venue-b":448.7049,"venue-c":448.7049,"offshore":448.7049}},{"ts":1793484000000,"fv":448.7023,"lo":402.6654,"hi":494.7391,"session":"CLOSED","venues":{"venue-a":448.7031,"venue-b":448.7031,"venue-c":448.7031,"offshore":448.7203}},{"ts":1793487600000,"fv":448.7007,"lo":402.8435,"hi":494.5579,"session":"CLOSED","venues":{"venue-a":448.6472,"venue-b":448.7011,"venue-c":448.7011,"offshore":448.7016}},{"ts":1793491200000,"fv":448.6993,"lo":402.8422,"hi":494.5564,"session":"CLOSED","venues":{"venue-a":448.6985,"venue-b":448.6999,"venue-c":448.6999,"offshore":448.6999}},{"ts":1793494800000,"fv":448.698,"lo":402.841,"hi":494.5549,"session":"CLOSED","venues":{"venue-a":448.6916,"venue-b":448.6985,"venue-c":448.6985,"offshore":448.6985}},{"ts":1793498400000,"fv":448.6962,"lo":402.66,"hi":494.7325,"session":"CLOSED","venues":{"venue-a":448.6968,"venue-b":448.697,"venue-c":448.697,"offshore":448.6975}},{"ts":1793502000000,"fv":448.6946,"lo":402.6585,"hi":494.7306,"session":"CLOSED","venues":{"venue-a":448.6952,"venue-b":448.6953,"venue-c":448.6953,"offshore":448.6953}},{"ts":1793505600000,"fv":448.693,"lo":402.6571,"hi":494.7289,"session":"CLOSED","venues":{"venue-a":448.6936,"venue-b":448.6936,"venue-c":448.6936,"offshore":448.6936}},{"ts":1793509200000,"fv":448.6914,"lo":402.6557,"hi":494.7271,"session":"CLOSED","venues":{"venue-a":448.692,"venue-b":448.692,"venue-c":448.692,"offshore":448.692}},{"ts":1793512800000,"fv":448.6899,"lo":402.6543,"hi":494.7255,"session":"CLOSED","venues":{"venue-a":448.6905,"venue-b":448.6905,"venue-c":448.6905,"offshore":448.6905}},{"ts":1793516400000,"fv":448.6884,"lo":402.653,"hi":494.7239,"session":"CLOSED","venues":{"venue-a":448.689,"venue-b":448.689,"venue-c":448.689,"offshore":448.7127}},{"ts":1793520000000,"fv":448.687,"lo":402.6517,"hi":494.7223,"session":"CLOSED","venues":{"venue-a":448.6876,"venue-b":448.6876,"venue-c":448.6876,"offshore":448.6882}},{"ts":1793523600000,"fv":448.6856,"lo":402.6505,"hi":494.7208,"session":"CLOSED","venues":{"venue-a":448.6862,"venue-b":448.6862,"venue-c":448.6862,"offshore":448.6862}},{"ts":1793527200000,"fv":448.6845,"lo":402.829,"hi":494.5401,"session":"CLOSED","venues":{"venue-a":448.704,"venue-b":448.6849,"venue-c":448.6849,"offshore":448.6849}},{"ts":1793530800000,"fv":448.6835,"lo":402.8281,"hi":494.539,"session":"CLOSED","venues":{"venue-a":448.6844,"venue-b":448.6839,"venue-c":448.6839,"offshore":448.6839}},{"ts":1793534400000,"fv":448.6826,"lo":402.8272,"hi":494.5379,"session":"CLOSED","venues":{"venue-a":448.683,"venue-b":448.683,"venue-c":448.683,"offshore":448.683}},{"ts":1793538000000,"fv":448.681,"lo":402.8258,"hi":494.5363,"session":"CLOSED","venues":{"venue-a":448.6626,"venue-b":448.6816,"venue-c":448.6816,"offshore":448.6812}},{"ts":1793541600000,"fv":448.6801,"lo":402.825,"hi":494.5352,"session":"CLOSED","venues":{"venue-a":448.68,"venue-b":448.6805,"venue-c":448.6805,"offshore":448.6805}},{"ts":1793545200000,"fv":448.6792,"lo":402.8242,"hi":494.5343,"session":"CLOSED","venues":{"venue-a":448.6796,"venue-b":448.6796,"venue-c":448.6796,"offshore":448.6796}},{"ts":1793548800000,"fv":448.6784,"lo":402.8234,"hi":494.5333,"session":"CLOSED","venues":{"venue-a":448.681,"venue-b":448.6787,"venue-c":448.6787,"offshore":448.6787}},{"ts":1793552400000,"fv":448.6775,"lo":402.8227,"hi":494.5323,"session":"CLOSED","venues":{"venue-a":448.6779,"venue-b":448.6779,"venue-c":448.6779,"offshore":448.6779}},{"ts":1793556000000,"fv":448.6767,"lo":402.8219,"hi":494.5314,"session":"CLOSED","venues":{"venue-a":448.677,"venue-b":448.677,"venue-c":448.677,"offshore":448.677}},{"ts":1793559600000,"fv":448.6759,"lo":402.8212,"hi":494.5305,"session":"CLOSED","venues":{"venue-a":448.6623,"venue-b":448.6762,"venue-c":448.6762,"offshore":448.6762}},{"ts":1793563200000,"fv":448.6751,"lo":402.8205,"hi":494.5297,"session":"CLOSED","venues":{"venue-a":448.6896,"venue-b":448.6754,"venue-c":448.6754,"offshore":448.6754}},{"ts":1793566800000,"fv":448.676,"lo":402.6418,"hi":494.7101,"session":"CLOSED","venues":{"venue-a":448.6766,"venue-b":448.6763,"venue-c":448.6763,"offshore":448.6748}},{"ts":1793570400000,"fv":448.675,"lo":402.6409,"hi":494.709,"session":"CLOSED","venues":{"venue-a":448.6754,"venue-b":448.6754,"venue-c":448.6754,"offshore":448.6753}},{"ts":1793574000000,"fv":448.6641,"lo":402.8106,"hi":494.5176,"session":"CLOSED","venues":{"venue-a":448.6764,"venue-b":448.6746,"venue-c":448.6746,"offshore":448.6746}},{"ts":1793577600000,"fv":448.6395,"lo":402.7886,"hi":494.4905,"session":"CLOSED","venues":{"venue-a":448.6498,"venue-b":448.6498,"venue-c":448.6498,"offshore":448.6498}},{"ts":1793581200000,"fv":448.6155,"lo":416.2254,"hi":481.0055,"session":"OVERNIGHT","venues":{"venue-a":448.6255,"venue-b":448.6255,"venue-c":448.6255,"offshore":448.6255}},{"ts":1793584800000,"fv":448.5919,"lo":416.2036,"hi":480.9802,"session":"OVERNIGHT","venues":{"venue-a":448.6017,"venue-b":448.6017,"venue-c":448.6017,"offshore":448.6017}},{"ts":1793588400000,"fv":448.5688,"lo":416.1821,"hi":480.9554,"session":"OVERNIGHT","venues":{"venue-a":448.5722,"venue-b":448.5784,"venue-c":448.5784,"offshore":448.5784}},{"ts":1793592000000,"fv":448.5461,"lo":416.1611,"hi":480.9311,"session":"OVERNIGHT","venues":{"venue-a":448.5554,"venue-b":448.5555,"venue-c":448.5555,"offshore":448.5555}},{"ts":1793595600000,"fv":448.5238,"lo":416.1404,"hi":480.9073,"session":"OVERNIGHT","venues":{"venue-a":448.5331,"venue-b":448.5331,"venue-c":448.5331,"offshore":448.5331}},{"ts":1793599200000,"fv":448.5034,"lo":416.1215,"hi":480.8854,"session":"OVERNIGHT","venues":{"venue-a":448.5077,"venue-b":448.5125,"venue-c":448.5125,"offshore":448.5125}},{"ts":1793602800000,"fv":448.482,"lo":416.1016,"hi":480.8624,"session":"OVERNIGHT","venues":{"venue-a":448.4908,"venue-b":448.4909,"venue-c":448.4909,"offshore":448.4909}},{"ts":1793606400000,"fv":448.4609,"lo":416.082,"hi":480.8398,"session":"OVERNIGHT","venues":{"venue-a":448.4746,"venue-b":448.4697,"venue-c":448.4697,"offshore":448.4697}},{"ts":1793610000000,"fv":449.5476,"lo":426.216,"hi":472.8791,"session":"EXTENDED","venues":{"venue-a":448.9028,"venue-b":448.9027,"venue-c":448.9027,"offshore":448.9027}},{"ts":1793613600000,"fv":451.4401,"lo":428.0104,"hi":474.8699,"session":"EXTENDED","venues":{"venue-a":450.7726,"venue-b":450.7722,"venue-c":450.7722,"offshore":450.7722}},{"ts":1793617200000,"fv":452.6685,"lo":429.1751,"hi":476.162,"session":"EXTENDED","venues":{"venue-a":452.1988,"venue-b":452.1988,"venue-c":452.1988,"offshore":452.1988}},{"ts":1793620800000,"fv":454.143,"lo":430.573,"hi":477.713,"session":"EXTENDED","venues":{"venue-a":453.599,"venue-b":453.599,"venue-c":453.599,"offshore":453.599}},{"ts":1793624400000,"fv":453.6245,"lo":430.0814,"hi":477.1676,"session":"EXTENDED","venues":{"venue-a":453.7354,"venue-b":453.7175,"venue-c":453.7175,"offshore":453.7175}},{"ts":1793628000000,"fv":453.1821,"lo":429.5714,"hi":476.7929,"session":"EXTENDED","venues":{"venue-a":453.0451,"venue-b":453.0446,"venue-c":453.0446,"offshore":453.046}},{"ts":1793631600000,"fv":450.8651,"lo":436.9334,"hi":464.7968,"session":"REGULAR","venues":{"venue-a":451.9207,"venue-b":451.8821,"venue-c":451.8821,"offshore":451.8821}}],"AMC":[{"ts":1793001600000,"fv":3.1945,"lo":3.0226,"hi":3.3664,"session":"EXTENDED","venues":{"venue-a":3.1968,"venue-b":3.1968,"venue-c":3.1968,"offshore":3.1968}},{"ts":1793005200000,"fv":3.2155,"lo":3.0425,"hi":3.3885,"session":"EXTENDED","venues":{"venue-a":3.236,"venue-b":3.2175,"venue-c":3.2354,"offshore":3.2175}},{"ts":1793008800000,"fv":3.218,"lo":3.0449,"hi":3.3911,"session":"EXTENDED","venues":{"venue-a":3.2156,"venue-b":3.2229,"venue-c":3.2159,"offshore":3.2229}},{"ts":1793012400000,"fv":3.215,"lo":3.042,"hi":3.3879,"session":"EXTENDED","venues":{"venue-a":3.2182,"venue-b":3.2198,"venue-c":3.2196,"offshore":3.2198}},{"ts":1793016000000,"fv":3.227,"lo":3.0534,"hi":3.4006,"session":"EXTENDED","venues":{"venue-a":3.219,"venue-b":3.219,"venue-c":3.219,"offshore":3.219}},{"ts":1793019600000,"fv":3.2402,"lo":3.0659,"hi":3.4145,"session":"EXTENDED","venues":{"venue-a":3.2406,"venue-b":3.2406,"venue-c":3.2406,"offshore":3.2406}},{"ts":1793023200000,"fv":3.2553,"lo":3.1544,"hi":3.3562,"session":"REGULAR","venues":{"venue-a":3.2477,"venue-b":3.2562,"venue-c":3.2484,"offshore":3.2562}},{"ts":1793026800000,"fv":3.2406,"lo":3.1401,"hi":3.341,"session":"REGULAR","venues":{"venue-a":3.2539,"venue-b":3.2406,"venue-c":3.2533,"offshore":3.2406}},{"ts":1793030400000,"fv":3.289,"lo":3.187,"hi":3.3909,"session":"REGULAR","venues":{"venue-a":3.286,"venue-b":3.2843,"venue-c":3.2836,"offshore":3.2832}},{"ts":1793034000000,"fv":3.2728,"lo":3.1713,"hi":3.3742,"session":"REGULAR","venues":{"venue-a":3.2798,"venue-b":3.2798,"venue-c":3.2798,"offshore":3.2798}},{"ts":1793037600000,"fv":3.2053,"lo":3.1059,"hi":3.3046,"session":"REGULAR","venues":{"venue-a":3.219,"venue-b":3.2187,"venue-c":3.2189,"offshore":3.2186}},{"ts":1793041200000,"fv":3.216,"lo":3.1163,"hi":3.3157,"session":"REGULAR","venues":{"venue-a":3.2174,"venue-b":3.2174,"venue-c":3.2174,"offshore":3.2174}},{"ts":1793044800000,"fv":3.1878,"lo":3.0163,"hi":3.3593,"session":"EXTENDED","venues":{"venue-a":3.1973,"venue-b":3.1973,"venue-c":3.1973,"offshore":3.1973}},{"ts":1793048400000,"fv":3.1818,"lo":3.0106,"hi":3.353,"session":"EXTENDED","venues":{"venue-a":3.1856,"venue-b":3.1856,"venue-c":3.1856,"offshore":3.1855}},{"ts":1793052000000,"fv":3.1799,"lo":3.0088,"hi":3.3509,"session":"EXTENDED","venues":{"venue-a":3.18,"venue-b":3.18,"venue-c":3.18,"offshore":3.18}},{"ts":1793055600000,"fv":3.1886,"lo":3.0171,"hi":3.3602,"session":"EXTENDED","venues":{"venue-a":3.191,"venue-b":3.191,"venue-c":3.191,"offshore":3.191}},{"ts":1793059200000,"fv":3.1742,"lo":2.8974,"hi":3.451,"session":"OVERNIGHT","venues":{"venue-a":3.17,"venue-b":3.17,"venue-c":3.17,"offshore":3.17}},{"ts":1793062800000,"fv":3.1885,"lo":2.89,"hi":3.4869,"session":"OVERNIGHT","venues":{"venue-a":3.1852,"venue-b":3.1851,"venue-c":3.1852,"offshore":3.1849}},{"ts":1793066400000,"fv":3.1931,"lo":2.8927,"hi":3.4936,"session":"OVERNIGHT","venues":{"venue-a":3.1913,"venue-b":3.1913,"venue-c":3.1913,"offshore":3.1913}},{"ts":1793070000000,"fv":3.1901,"lo":2.8886,"hi":3.4915,"session":"OVERNIGHT","venues":{"venue-a":3.1871,"venue-b":3.1887,"venue-c":3.1876,"offshore":3.1948}},{"ts":1793073600000,"fv":3.1935,"lo":2.8904,"hi":3.4965,"session":"OVERNIGHT","venues":{"venue-a":3.1921,"venue-b":3.1921,"venue-c":3.1921,"offshore":3.1923}},{"ts":1793077200000,"fv":3.1965,"lo":2.9152,"hi":3.4777,"session":"OVERNIGHT","venues":{"venue-a":3.198,"venue-b":3.1965,"venue-c":3.1974,"offshore":3.1948}},{"ts":1793080800000,"fv":3.1972,"lo":2.9155,"hi":3.4788,"session":"OVERNIGHT","venues":{"venue-a":3.1969,"venue-b":3.1969,"venue-c":3.1969,"offshore":3.1968}},{"ts":1793084400000,"fv":3.1977,"lo":2.9157,"hi":3.4797,"session":"OVERNIGHT","venues":{"venue-a":3.1975,"venue-b":3.1975,"venue-c":3.1975,"offshore":3.1975}},{"ts":1793088000000,"fv":3.1703,"lo":2.9997,"hi":3.3408,"session":"EXTENDED","venues":{"venue-a":3.1796,"venue-b":3.1788,"venue-c":3.1787,"offshore":3.18}},{"ts":1793091600000,"fv":3.1946,"lo":3.0227,"hi":3.3664,"session":"EXTENDED","venues":{"venue-a":3.1856,"venue-b":3.1856,"venue-c":3.1856,"offshore":3.1856}},{"ts":1793095200000,"fv":3.2343,"lo":3.06,"hi":3.4087,"session":"EXTENDED","venues":{"venue-a":3.233,"venue-b":3.2314,"venue-c":3.2323,"offshore":3.2277}},{"ts":1793098800000,"fv":3.2236,"lo":3.0498,"hi":3.3973,"session":"EXTENDED","venues":{"venue-a":3.235,"venue-b":3.2349,"venue-c":3.235,"offshore":3.2361}},{"ts":1793102400000,"fv":3.2913,"lo":3.1139,"hi":3.4687,"session":"EXTENDED","venues":{"venue-a":3.2808,"venue-b":3.2808,"venue-c":3.2808,"offshore":3.2808}},{"ts":1793106000000,"fv":3.2436,"lo":3.0688,"hi":3.4184,"session":"EXTENDED","venues":{"venue-a":3.2511,"venue-b":3.251,"venue-c":3.2511,"offshore":3.2504}},{"ts":1793109600000,"fv":3.2735,"lo":3.172,"hi":3.375,"session":"REGULAR","venues":{"venue-a":3.2643,"venue-b":3.2643,"venue-c":3.2643,"offshore":3.2643}},{"ts":1793113200000,"fv":3.2618,"lo":3.1607,"hi":3.3629,"session":"REGULAR","venues":{"venue-a":3.2671,"venue-b":3.2671,"venue-c":3.2671,"offshore":3.2671}},{"ts":1793116800000,"fv":3.2306,"lo":3.1304,"hi":3.3307,"session":"REGULAR","venues":{"venue-a":3.2336,"venue-b":3.2335,"venue-c":3.2336,"offshore":3.232}},{"ts":1793120400000,"fv":3.2498,"lo":3.1491,"hi":3.3505,"session":"REGULAR","venues":{"venue-a":3.2562,"venue-b":3.2562,"venue-c":3.2562,"offshore":3.2562}},{"ts":1793124000000,"fv":3.2308,"lo":3.1306,"hi":3.3309,"session":"REGULAR","venues":{"venue-a":3.2401,"venue-b":3.2385,"venue-c":3.2381,"offshore":3.2331}},{"ts":1793127600000,"fv":3.2611,"lo":3.16,"hi":3.3622,"session":"REGULAR","venues":{"venue-a":3.2542,"venue-b":3.2542,"venue-c":3.2542,"offshore":3.2541}},{"ts":1793131200000,"fv":3.2914,"lo":3.114,"hi":3.4688,"session":"EXTENDED","venues":{"venue-a":3.2784,"venue-b":3.2784,"venue-c":3.2784,"offshore":3.2784}},{"ts":1793134800000,"fv":3.236,"lo":3.0616,"hi":3.4105,"session":"EXTENDED","venues":{"venue-a":3.2445,"venue-b":3.2445,"venue-c":3.2445,"offshore":3.2445}},{"ts":1793138400000,"fv":3.2393,"lo":3.0647,"hi":3.4139,"session":"EXTENDED","venues":{"venue-a":3.2408,"venue-b":3.2407,"venue-c":3.2408,"offshore":3.2404}},{"ts":1793142000000,"fv":3.2554,"lo":3.0802,"hi":3.4305,"session":"EXTENDED","venues":{"venue-a":3.2542,"venue-b":3.2536,"venue-c":3.2532,"offshore":3.2532}},{"ts":1793145600000,"fv":3.2268,"lo":2.9428,"hi":3.5107,"session":"OVERNIGHT","venues":{"venue-a":3.2199,"venue-b":3.2199,"venue-c":3.2199,"offshore":3.2199}},{"ts":1793149200000,"fv":3.2371,"lo":2.9513,"hi":3.523,"session":"OVERNIGHT","venues":{"venue-a":3.233,"venue-b":3.233,"venue-c":3.233,"offshore":3.233}},{"ts":1793152800000,"fv":3.2439,"lo":2.9565,"hi":3.5313,"session":"OVERNIGHT","venues":{"venue-a":3.2412,"venue-b":3.2412,"venue-c":3.2412,"offshore":3.2412}},{"ts":1793156400000,"fv":3.2485,"lo":2.96,"hi":3.537,"session":"OVERNIGHT","venues":{"venue-a":3.2466,"venue-b":3.2466,"venue-c":3.2466,"offshore":3.2466}},{"ts":1793160000000,"fv":3.2518,"lo":2.9627,"hi":3.5409,"session":"OVERNIGHT","venues":{"venue-a":3.2505,"venue-b":3.2505,"venue-c":3.2505,"offshore":3.2505}},{"ts":1793163600000,"fv":3.2543,"lo":2.9647,"hi":3.544,"session":"OVERNIGHT","venues":{"venue-a":3.2533,"venue-b":3.2533,"venue-c":3.2533,"offshore":3.2533}},{"ts":1793167200000,"fv":3.2561,"lo":2.966,"hi":3.5463,"session":"OVERNIGHT","venues":{"venue-a":3.2553,"venue-b":3.2553,"venue-c":3.2553,"offshore":3.2553}},{"ts":1793170800000,"fv":3.263,"lo":2.9637,"hi":3.5622,"session":"OVERNIGHT","venues":{"venue-a":3.2635,"venue-b":3.2619,"venue-c":3.2629,"offshore":3.2568}},{"ts":1793174400000,"fv":3.2169,"lo":3.0436,"hi":3.3903,"session":"EXTENDED","venues":{"venue-a":3.236,"venue-b":3.2359,"venue-c":3.236,"offshore":3.2358}},{"ts":1793178000000,"fv":3.2297,"lo":3.0556,"hi":3.4038,"session":"EXTENDED","venues":{"venue-a":3.2305,"venue-b":3.2305,"venue-c":3.2305,"offshore":3.2305}},{"ts":1793181600000,"fv":3.221,"lo":3.0474,"hi":3.3947,"session":"EXTENDED","venues":{"venue-a":3.217,"venue-b":3.217,"venue-c":3.217,"offshore":3.217}},{"ts":1793185200000,"fv":3.2321,"lo":3.0579,"hi":3.4064,"session":"EXTENDED","venues":{"venue-a":3.228,"venue-b":3.2283,"venue-c":3.2281,"offshore":3.2291}},{"ts":1793188800000,"fv":3.2066,"lo":3.0337,"hi":3.3794,"session":"EXTENDED","venues":{"venue-a":3.219,"venue-b":3.219,"venue-c":3.219,"offshore":3.219}},{"ts":1793192400000,"fv":3.1723,"lo":3.0013,"hi":3.3433,"session":"EXTENDED","venues":{"venue-a":3.1811,"venue-b":3.1811,"venue-c":3.1811,"offshore":3.1811}},{"ts":1793196000000,"fv":3.1636,"lo":3.0655,"hi":3.2617,"session":"REGULAR","venues":{"venue-a":3.1704,"venue-b":3.1698,"venue-c":3.1702,"offshore":3.1678}},{"ts":1793199600000,"fv":3.1259,"lo":3.029,"hi":3.2228,"session":"REGULAR","venues":{"venue-a":3.1326,"venue-b":3.1341,"venue-c":3.1332,"offshore":3.1371}},{"ts":1793203200000,"fv":3.1069,"lo":3.0105,"hi":3.2032,"session":"REGULAR","venues":{"venue-a":3.1031,"venue-b":3.1031,"venue-c":3.1031,"offshore":3.1032}},{"ts":1793206800000,"fv":3.1388,"lo":3.0415,"hi":3.2361,"session":"REGULAR","venues":{"venue-a":3.135,"venue-b":3.1347,"venue-c":3.1349,"offshore":3.1339}},{"ts":1793210400000,"fv":3.1803,"lo":3.0818,"hi":3.2789,"session":"REGULAR","venues":{"venue-a":3.1724,"venue-b":3.1724,"venue-c":3.1724,"offshore":3.1724}},{"ts":1793214000000,"fv":3.2111,"lo":3.1116,"hi":3.3107,"session":"REGULAR","venues":{"venue-a":3.2041,"venue-b":3.2025,"venue-c":3.2021,"offshore":3.2021}},{"ts":1793217600000,"fv":3.1638,"lo":2.9932,"hi":3.3343,"session":"EXTENDED","venues":{"venue-a":3.1745,"venue-b":3.1745,"venue-c":3.1745,"offshore":3.1745}},{"ts":1793221200000,"fv":3.1769,"lo":3.0057,"hi":3.3481,"session":"EXTENDED","venues":{"venue-a":3.1698,"venue-b":3.1698,"venue-c":3.1698,"offshore":3.1698}},{"ts":1793224800000,"fv":3.1478,"lo":2.9781,"hi":3.3174,"session":"EXTENDED","venues":{"venue-a":3.149,"venue-b":3.149,"venue-c":3.149,"offshore":3.149}},{"ts":1793228400000,"fv":3.1258,"lo":2.9573,"hi":3.2943,"session":"EXTENDED","venues":{"venue-a":3.1355,"venue-b":3.1355,"venue-c":3.1355,"offshore":3.1355}},{"ts":1793232000000,"fv":3.147,"lo":2.8549,"hi":3.439,"session":"OVERNIGHT","venues":{"venue-a":3.1352,"venue-b":3.1352,"venue-c":3.1352,"offshore":3.1412}},{"ts":1793235600000,"fv":3.1621,"lo":2.8662,"hi":3.4581,"session":"OVERNIGHT","venues":{"venue-a":3.1563,"venue-b":3.1563,"venue-c":3.1563,"offshore":3.1565}},{"ts":1793239200000,"fv":3.1727,"lo":2.8742,"hi":3.4713,"session":"OVERNIGHT","venues":{"venue-a":3.1702,"venue-b":3.1699,"venue-c":3.1701,"offshore":3.1695}},{"ts":1793242800000,"fv":3.1768,"lo":2.8763,"hi":3.4773,"session":"OVERNIGHT","venues":{"venue-a":3.1752,"venue-b":3.1752,"venue-c":3.1752,"offshore":3.1752}},{"ts":1793246400000,"fv":3.1789,"lo":2.8887,"hi":3.4692,"session":"OVERNIGHT","venues":{"venue-a":3.1785,"venue-b":3.1782,"venue-c":3.1781,"offshore":3.1781}},{"ts":1793250000000,"fv":3.1802,"lo":2.8892,"hi":3.4712,"session":"OVERNIGHT","venues":{"venue-a":3.1797,"venue-b":3.1797,"venue-c":3.1797,"offshore":3.1797}},{"ts":1793253600000,"fv":3.1812,"lo":2.8898,"hi":3.4726,"session":"OVERNIGHT","venues":{"venue-a":3.1808,"venue-b":3.1808,"venue-c":3.1808,"offshore":3.1808}},{"ts":1793257200000,"fv":3.1739,"lo":2.8704,"hi":3.4773,"session":"OVERNIGHT","venues":{"venue-a":3.1717,"venue-b":3.1732,"venue-c":3.1723,"offshore":3.1816}},{"ts":1793260800000,"fv":3.1195,"lo":2.9514,"hi":3.2876,"session":"EXTENDED","venues":{"venue-a":3.1486,"venue-b":3.147,"venue-c":3.148,"offshore":3.1422}},{"ts":1793264400000,"fv":3.1238,"lo":2.9555,"hi":3.2922,"session":"EXTENDED","venues":{"venue-a":3.1267,"venue-b":3.1267,"venue-c":3.1267,"offshore":3.1266}},{"ts":1793268000000,"fv":3.1928,"lo":3.0207,"hi":3.3649,"session":"EXTENDED","venues":{"venue-a":3.1782,"venue-b":3.1782,"venue-c":3.1782,"offshore":3.1782}},{"ts":1793271600000,"fv":3.1785,"lo":3.0072,"hi":3.3498,"session":"EXTENDED","venues":{"venue-a":3.1755,"venue-b":3.1739,"venue-c":3.1733,"offshore":3.1733}},{"ts":1793275200000,"fv":3.1213,"lo":2.9531,"hi":3.2895,"session":"EXTENDED","venues":{"venue-a":3.1337,"venue-b":3.1336,"venue-c":3.1336,"offshore":3.1336}},{"ts":1793278800000,"fv":3.1114,"lo":2.9437,"hi":3.2791,"session":"EXTENDED","venues":{"venue-a":3.1158,"venue-b":3.1158,"venue-c":3.1158,"offshore":3.1158}},{"ts":1793282400000,"fv":3.1283,"lo":3.0313,"hi":3.2253,"session":"REGULAR","venues":{"venue-a":3.1247,"venue-b":3.1247,"venue-c":3.1247,"offshore":3.1247}},{"ts":1793286000000,"fv":3.1152,"lo":3.0186,"hi":3.2117,"session":"REGULAR","venues":{"venue-a":3.121,"venue-b":3.1211,"venue-c":3.121,"offshore":3.1213}},{"ts":1793289600000,"fv":3.1369,"lo":3.0397,"hi":3.2342,"session":"REGULAR","venues":{"venue-a":3.1379,"venue-b":3.1381,"venue-c":3.138,"offshore":3.1388}},{"ts":1793293200000,"fv":3.1371,"lo":3.0399,"hi":3.2344,"session":"REGULAR","venues":{"venue-a":3.1403,"venue-b":3.14,"venue-c":3.1402,"offshore":3.1397}},{"ts":1793296800000,"fv":3.137,"lo":3.0398,"hi":3.2343,"session":"REGULAR","venues":{"venue-a":3.1297,"venue-b":3.1304,"venue-c":3.13,"offshore":3.1316}},{"ts":1793300400000,"fv":3.0934,"lo":2.9975,"hi":3.1893,"session":"REGULAR","venues":{"venue-a":3.1044,"venue-b":3.1038,"venue-c":3.1042,"offshore":3.0998}},{"ts":1793304000000,"fv":3.1214,"lo":2.9531,"hi":3.2896,"session":"EXTENDED","venues":{"venue-a":3.1207,"venue-b":3.12,"venue-c":3.1204,"offshore":3.1176}},{"ts":1793307600000,"fv":3.0765,"lo":2.9107,"hi":3.2423,"session":"EXTENDED","venues":{"venue-a":3.0833,"venue-b":3.0833,"venue-c":3.0833,"offshore":3.0833}},{"ts":1793311200000,"fv":3.0811,"lo":2.915,"hi":3.2471,"session":"EXTENDED","venues":{"venue-a":3.0876,"venue-b":3.0876,"venue-c":3.0876,"offshore":3.0876}},{"ts":1793314800000,"fv":3.1144,"lo":2.9465,"hi":3.2823,"session":"EXTENDED","venues":{"venue-a":3.1094,"venue-b":3.1094,"venue-c":3.1094,"offshore":3.1094}},{"ts":1793318400000,"fv":3.1253,"lo":2.8352,"hi":3.4153,"session":"OVERNIGHT","venues":{"venue-a":3.1271,"venue-b":3.1271,"venue-c":3.1271,"offshore":3.1271}},{"ts":1793322000000,"fv":3.1229,"lo":2.8306,"hi":3.4152,"session":"OVERNIGHT","venues":{"venue-a":3.1238,"venue-b":3.1238,"venue-c":3.1238,"offshore":3.1238}},{"ts":1793325600000,"fv":3.1269,"lo":2.8323,"hi":3.4214,"session":"OVERNIGHT","venues":{"venue-a":3.1288,"venue-b":3.1282,"venue-c":3.1285,"offshore":3.1256}},{"ts":1793329200000,"fv":3.1244,"lo":2.8288,"hi":3.42,"session":"OVERNIGHT","venues":{"venue-a":3.1254,"venue-b":3.1254,"venue-c":3.1254,"offshore":3.1253}},{"ts":1793332800000,"fv":3.1183,"lo":2.8221,"hi":3.4146,"session":"OVERNIGHT","venues":{"venue-a":3.1181,"venue-b":3.1182,"venue-c":3.1181,"offshore":3.1186}},{"ts":1793336400000,"fv":3.1186,"lo":2.8214,"hi":3.4158,"session":"OVERNIGHT","venues":{"venue-a":3.1185,"venue-b":3.1185,"venue-c":3.1185,"offshore":3.1185}},{"ts":1793340000000,"fv":3.1188,"lo":2.8209,"hi":3.4166,"session":"OVERNIGHT","venues":{"venue-a":3.1187,"venue-b":3.1187,"venue-c":3.1187,"offshore":3.1187}},{"ts":1793343600000,"fv":3.1189,"lo":2.8204,"hi":3.4174,"session":"OVERNIGHT","venues":{"venue-a":3.1188,"venue-b":3.1188,"venue-c":3.1188,"offshore":3.1188}},{"ts":1793347200000,"fv":3.1117,"lo":2.944,"hi":3.2794,"session":"EXTENDED","venues":{"venue-a":3.1146,"venue-b":3.1146,"venue-c":3.1146,"offshore":3.1146}},{"ts":1793350800000,"fv":3.0727,"lo":2.9071,"hi":3.2384,"session":"EXTENDED","venues":{"venue-a":3.0849,"venue-b":3.0849,"venue-c":3.0849,"offshore":3.0849}},{"ts":1793354400000,"fv":3.0951,"lo":2.9282,"hi":3.2619,"session":"EXTENDED","venues":{"venue-a":3.084,"venue-b":3.084,"venue-c":3.084,"offshore":3.084}},{"ts":1793358000000,"fv":3.0868,"lo":2.9208,"hi":3.2529,"session":"EXTENDED","venues":{"venue-a":3.0952,"venue-b":3.0952,"venue-c":3.0952,"offshore":3.0952}},{"ts":1793361600000,"fv":3.1043,"lo":2.9373,"hi":3.2713,"session":"EXTENDED","venues":{"venue-a":3.1074,"venue-b":3.1074,"venue-c":3.1074,"offshore":3.1074}},{"ts":1793365200000,"fv":3.1006,"lo":2.9338,"hi":3.2675,"session":"EXTENDED","venues":{"venue-a":3.1084,"venue-b":3.1084,"venue-c":3.1084,"offshore":3.1084}},{"ts":1793368800000,"fv":3.0627,"lo":2.9677,"hi":3.1576,"session":"REGULAR","venues":{"venue-a":3.0695,"venue-b":3.0689,"venue-c":3.0693,"offshore":3.0655}},{"ts":1793372400000,"fv":3.1018,"lo":3.0056,"hi":3.1979,"session":"REGULAR","venues":{"venue-a":3.0987,"venue-b":3.0986,"venue-c":3.0986,"offshore":3.0985}},{"ts":1793376000000,"fv":3.1011,"lo":3.0049,"hi":3.1972,"session":"REGULAR","venues":{"venue-a":3.0997,"venue-b":3.0997,"venue-c":3.0997,"offshore":3.0842}},{"ts":1793379600000,"fv":3.12,"lo":3.0232,"hi":3.2167,"session":"REGULAR","venues":{"venue-a":3.1238,"venue-b":3.1243,"venue-c":3.124,"offshore":3.1235}},{"ts":1793383200000,"fv":3.0793,"lo":2.9838,"hi":3.1747,"session":"REGULAR","venues":{"venue-a":3.0878,"venue-b":3.088,"venue-c":3.0879,"offshore":3.0892}},{"ts":1793386800000,"fv":3.1065,"lo":3.0102,"hi":3.2028,"session":"REGULAR","venues":{"venue-a":3.0901,"venue-b":3.0918,"venue-c":3.0909,"offshore":3.0985}},{"ts":1793390400000,"fv":3.115,"lo":2.9471,"hi":3.2829,"session":"EXTENDED","venues":{"venue-a":3.1096,"venue-b":3.1096,"venue-c":3.1096,"offshore":3.1062}},{"ts":1793394000000,"fv":3.1465,"lo":2.9769,"hi":3.3161,"session":"EXTENDED","venues":{"venue-a":3.1448,"venue-b":3.1445,"venue-c":3.1447,"offshore":3.1435}},{"ts":1793397600000,"fv":3.1592,"lo":2.989,"hi":3.3295,"session":"EXTENDED","venues":{"venue-a":3.1611,"venue-b":3.1596,"venue-c":3.1605,"offshore":3.1538}},{"ts":1793401200000,"fv":3.1211,"lo":2.9529,"hi":3.2894,"session":"EXTENDED","venues":{"venue-a":3.1245,"venue-b":3.1245,"venue-c":3.1245,"offshore":3.1228}},{"ts":1793404800000,"fv":3.1126,"lo":2.7301,"hi":3.4952,"session":"CLOSED","venues":{"venue-a":3.1138,"venue-b":3.1138,"venue-c":3.1138,"offshore":3.1138}},{"ts":1793408400000,"fv":3.1179,"lo":2.7326,"hi":3.5033,"session":"CLOSED","venues":{"venue-a":3.1206,"venue-b":3.12,"venue-c":3.1204,"offshore":3.1164}},{"ts":1793412000000,"fv":3.1146,"lo":2.7278,"hi":3.5015,"session":"CLOSED","venues":{"venue-a":3.1159,"venue-b":3.1159,"venue-c":3.1159,"offshore":3.1158}},{"ts":1793415600000,"fv":3.1127,"lo":2.7246,"hi":3.5009,"session":"CLOSED","venues":{"venue-a":3.1135,"venue-b":3.1135,"venue-c":3.1135,"offshore":3.1135}},{"ts":1793419200000,"fv":3.1115,"lo":2.7226,"hi":3.5005,"session":"CLOSED","venues":{"venue-a":3.112,"venue-b":3.112,"venue-c":3.112,"offshore":3.112}},{"ts":1793422800000,"fv":3.1108,"lo":2.721,"hi":3.5005,"session":"CLOSED","venues":{"venue-a":3.1111,"venue-b":3.1111,"venue-c":3.1111,"offshore":3.1111}},{"ts":1793426400000,"fv":3.1102,"lo":2.7199,"hi":3.5006,"session":"CLOSED","venues":{"venue-a":3.1104,"venue-b":3.1104,"venue-c":3.1104,"offshore":3.1104}},{"ts":1793430000000,"fv":3.1099,"lo":2.719,"hi":3.5008,"session":"CLOSED","venues":{"venue-a":3.11,"venue-b":3.11,"venue-c":3.11,"offshore":3.11}},{"ts":1793433600000,"fv":3.1096,"lo":2.7181,"hi":3.5011,"session":"CLOSED","venues":{"venue-a":3.1097,"venue-b":3.1097,"venue-c":3.1097,"offshore":3.1097}},{"ts":1793437200000,"fv":3.1143,"lo":2.7219,"hi":3.5067,"session":"CLOSED","venues":{"venue-a":3.1152,"venue-b":3.1146,"venue-c":3.115,"offshore":3.1126}},{"ts":1793440800000,"fv":3.1132,"lo":2.7207,"hi":3.5058,"session":"CLOSED","venues":{"venue-a":3.1137,"venue-b":3.1137,"venue-c":3.1137,"offshore":3.1136}},{"ts":1793444400000,"fv":3.1124,"lo":2.7196,"hi":3.5052,"session":"CLOSED","venues":{"venue-a":3.1127,"venue-b":3.1127,"venue-c":3.1127,"offshore":3.1127}},{"ts":1793448000000,"fv":3.1118,"lo":2.7187,"hi":3.5048,"session":"CLOSED","venues":{"venue-a":3.112,"venue-b":3.112,"venue-c":3.112,"offshore":3.112}},{"ts":1793451600000,"fv":3.1112,"lo":2.718,"hi":3.5045,"session":"CLOSED","venues":{"venue-a":3.1114,"venue-b":3.1114,"venue-c":3.1114,"offshore":3.1114}},{"ts":1793455200000,"fv":3.1108,"lo":2.7173,"hi":3.5044,"session":"CLOSED","venues":{"venue-a":3.111,"venue-b":3.111,"venue-c":3.111,"offshore":3.111}},{"ts":1793458800000,"fv":3.1105,"lo":2.7167,"hi":3.5043,"session":"CLOSED","venues":{"venue-a":3.1106,"venue-b":3.1106,"venue-c":3.1106,"offshore":3.1106}},{"ts":1793462400000,"fv":3.4854,"lo":3.0605,"hi":3.9103,"session":"CLOSED","venues":{"venue-a":3.5008,"venue-b":3.504,"venue-c":3.5018,"offshore":3.1104}},{"ts":1793466000000,"fv":3.4494,"lo":3.0286,"hi":3.8702,"session":"CLOSED","venues":{"venue-a":3.4641,"venue-b":3.4642,"venue-c":3.4641,"offshore":3.4541}},{"ts":1793469600000,"fv":3.418,"lo":3.0007,"hi":3.8353,"session":"CLOSED","venues":{"venue-a":3.4309,"venue-b":3.4309,"venue-c":3.4309,"offshore":3.4306}},{"ts":1793473200000,"fv":3.3905,"lo":2.9765,"hi":3.8045,"session":"CLOSED","venues":{"venue-a":3.4018,"venue-b":3.4018,"venue-c":3.4018,"offshore":3.4018}},{"ts":1793476800000,"fv":3.3664,"lo":2.955,"hi":3.7777,"session":"CLOSED","venues":{"venue-a":3.3763,"venue-b":3.3763,"venue-c":3.3763,"offshore":3.3763}},{"ts":1793480400000,"fv":3.345,"lo":2.9359,"hi":3.7541,"session":"CLOSED","venues":{"venue-a":3.3538,"venue-b":3.3538,"venue-c":3.3538,"offshore":3.3538}},{"ts":1793484000000,"fv":3.3261,"lo":2.9193,"hi":3.7329,"session":"CLOSED","venues":{"venue-a":3.3339,"venue-b":3.3339,"venue-c":3.3339,"offshore":3.3339}},{"ts":1793487600000,"fv":3.3092,"lo":2.9042,"hi":3.7143,"session":"CLOSED","venues":{"venue-a":3.3161,"venue-b":3.3161,"venue-c":3.3161,"offshore":3.3161}},{"ts":1793491200000,"fv":3.2941,"lo":2.8909,"hi":3.6973,"session":"CLOSED","venues":{"venue-a":3.3003,"venue-b":3.3003,"venue-c":3.3003,"offshore":3.3003}},{"ts":1793494800000,"fv":3.2806,"lo":2.8787,"hi":3.6825,"session":"CLOSED","venues":{"venue-a":3.2862,"venue-b":3.2862,"venue-c":3.2862,"offshore":3.2862}},{"ts":1793498400000,"fv":3.2744,"lo":2.891,"hi":3.6579,"session":"CLOSED","venues":{"venue-a":3.2774,"venue-b":3.2774,"venue-c":3.2774,"offshore":3.2774}},{"ts":1793502000000,"fv":3.2634,"lo":2.8636,"hi":3.6632,"session":"CLOSED","venues":{"venue-a":3.2681,"venue-b":3.2681,"venue-c":3.2681,"offshore":3.2699}},{"ts":1793505600000,"fv":3.2543,"lo":2.8557,"hi":3.653,"session":"CLOSED","venues":{"venue-a":3.2586,"venue-b":3.2586,"venue-c":3.2586,"offshore":3.259}},{"ts":1793509200000,"fv":3.2449,"lo":2.847,"hi":3.6427,"session":"CLOSED","venues":{"venue-a":3.2488,"venue-b":3.2488,"venue-c":3.2488,"offshore":3.2488}},{"ts":1793512800000,"fv":3.2362,"lo":2.8395,"hi":3.633,"session":"CLOSED","venues":{"venue-a":3.2398,"venue-b":3.2398,"venue-c":3.2398,"offshore":3.2398}},{"ts":1793516400000,"fv":3.2284,"lo":2.8326,"hi":3.6242,"session":"CLOSED","venues":{"venue-a":3.2316,"venue-b":3.2316,"venue-c":3.2316,"offshore":3.2316}},{"ts":1793520000000,"fv":3.2212,"lo":2.8259,"hi":3.6164,"session":"CLOSED","venues":{"venue-a":3.2241,"venue-b":3.2241,"venue-c":3.2241,"offshore":3.2241}},{"ts":1793523600000,"fv":3.2146,"lo":2.8201,"hi":3.609,"session":"CLOSED","venues":{"venue-a":3.2173,"venue-b":3.2173,"venue-c":3.2173,"offshore":3.2173}},{"ts":1793527200000,"fv":3.2096,"lo":2.8158,"hi":3.6034,"session":"CLOSED","venues":{"venue-a":3.2121,"venue-b":3.2121,"venue-c":3.2121,"offshore":3.2125}},{"ts":1793530800000,"fv":3.2046,"lo":2.8114,"hi":3.5978,"session":"CLOSED","venues":{"venue-a":3.2069,"venue-b":3.2069,"venue-c":3.2069,"offshore":3.2069}},{"ts":1793534400000,"fv":3.2024,"lo":2.827,"hi":3.5777,"session":"CLOSED","venues":{"venue-a":3.2039,"venue-b":3.2036,"venue-c":3.2038,"offshore":3.2035}},{"ts":1793538000000,"fv":3.1995,"lo":2.8245,"hi":3.5745,"session":"CLOSED","venues":{"venue-a":3.2007,"venue-b":3.2007,"venue-c":3.2007,"offshore":3.2007}},{"ts":1793541600000,"fv":3.1962,"lo":2.8168,"hi":3.5756,"session":"CLOSED","venues":{"venue-a":3.1975,"venue-b":3.1975,"venue-c":3.1975,"offshore":3.1975}},{"ts":1793545200000,"fv":3.1931,"lo":2.8141,"hi":3.5722,"session":"CLOSED","venues":{"venue-a":3.1944,"venue-b":3.1944,"venue-c":3.1944,"offshore":3.1944}},{"ts":1793548800000,"fv":3.1903,"lo":2.8116,"hi":3.5689,"session":"CLOSED","venues":{"venue-a":3.1914,"venue-b":3.1914,"venue-c":3.1914,"offshore":3.1914}},{"ts":1793552400000,"fv":3.1875,"lo":2.8092,"hi":3.5659,"session":"CLOSED","venues":{"venue-a":3.1887,"venue-b":3.1887,"venue-c":3.1887,"offshore":3.1887}},{"ts":1793556000000,"fv":3.185,"lo":2.8069,"hi":3.563,"session":"CLOSED","venues":{"venue-a":3.186,"venue-b":3.186,"venue-c":3.186,"offshore":3.186}},{"ts":1793559600000,"fv":3.1825,"lo":2.8048,"hi":3.5603,"session":"CLOSED","venues":{"venue-a":3.1836,"venue-b":3.1836,"venue-c":3.1836,"offshore":3.1836}},{"ts":1793563200000,"fv":3.1802,"lo":2.8024,"hi":3.558,"session":"CLOSED","venues":{"venue-a":3.1812,"venue-b":3.1812,"venue-c":3.1812,"offshore":3.1812}},{"ts":1793566800000,"fv":3.178,"lo":2.8005,"hi":3.5556,"session":"CLOSED","venues":{"venue-a":3.1789,"venue-b":3.1789,"venue-c":3.1789,"offshore":3.1789}},{"ts":1793570400000,"fv":3.176,"lo":2.7986,"hi":3.5533,"session":"CLOSED","venues":{"venue-a":3.1768,"venue-b":3.1768,"venue-c":3.1768,"offshore":3.1768}},{"ts":1793574000000,"fv":3.172,"lo":2.7955,"hi":3.5485,"session":"CLOSED","venues":{"venue-a":3.1748,"venue-b":3.1748,"venue-c":3.1748,"offshore":3.1748}},{"ts":1793577600000,"fv":3.1657,"lo":2.7899,"hi":3.5415,"session":"CLOSED","venues":{"venue-a":3.1683,"venue-b":3.1683,"venue-c":3.1683,"offshore":3.1683}},{"ts":1793581200000,"fv":3.1598,"lo":2.8795,"hi":3.44,"session":"OVERNIGHT","venues":{"venue-a":3.1622,"venue-b":3.1622,"venue-c":3.1622,"offshore":3.1622}},{"ts":1793584800000,"fv":3.1542,"lo":2.8744,"hi":3.4339,"session":"OVERNIGHT","venues":{"venue-a":3.1565,"venue-b":3.1565,"venue-c":3.1565,"offshore":3.1565}},{"ts":1793588400000,"fv":3.1489,"lo":2.8696,"hi":3.4282,"session":"OVERNIGHT","venues":{"venue-a":3.1511,"venue-b":3.1511,"venue-c":3.1511,"offshore":3.1511}},{"ts":1793592000000,"fv":3.1495,"lo":2.8437,"hi":3.4554,"session":"OVERNIGHT","venues":{"venue-a":3.1542,"venue-b":3.154,"venue-c":3.1541,"offshore":3.1556}},{"ts":1793595600000,"fv":3.1395,"lo":2.8346,"hi":3.4443,"session":"OVERNIGHT","venues":{"venue-a":3.1436,"venue-b":3.1436,"venue-c":3.1436,"offshore":3.1402}},{"ts":1793599200000,"fv":3.1304,"lo":2.8261,"hi":3.4347,"session":"OVERNIGHT","venues":{"venue-a":3.1341,"venue-b":3.1341,"venue-c":3.1341,"offshore":3.134}},{"ts":1793602800000,"fv":3.1222,"lo":2.8187,"hi":3.4257,"session":"OVERNIGHT","venues":{"venue-a":3.1256,"venue-b":3.1256,"venue-c":3.1256,"offshore":3.1256}},{"ts":1793606400000,"fv":3.1148,"lo":2.812,"hi":3.4176,"session":"OVERNIGHT","venues":{"venue-a":3.1178,"venue-b":3.1178,"venue-c":3.1178,"offshore":3.1178}},{"ts":1793610000000,"fv":3.0901,"lo":2.9235,"hi":3.2566,"session":"EXTENDED","venues":{"venue-a":3.0992,"venue-b":3.0992,"venue-c":3.0992,"offshore":3.0992}},{"ts":1793613600000,"fv":3.0875,"lo":2.9211,"hi":3.2539,"session":"EXTENDED","venues":{"venue-a":3.0849,"venue-b":3.0849,"venue-c":3.0849,"offshore":3.0849}},{"ts":1793617200000,"fv":3.0647,"lo":2.8995,"hi":3.2298,"session":"EXTENDED","venues":{"venue-a":3.0636,"venue-b":3.0636,"venue-c":3.0636,"offshore":3.0636}},{"ts":1793620800000,"fv":3.0742,"lo":2.9085,"hi":3.2399,"session":"EXTENDED","venues":{"venue-a":3.0759,"venue-b":3.0759,"venue-c":3.0759,"offshore":3.0759}},{"ts":1793624400000,"fv":3.0668,"lo":2.9018,"hi":3.2318,"session":"EXTENDED","venues":{"venue-a":3.0627,"venue-b":3.0627,"venue-c":3.0627,"offshore":3.0627}},{"ts":1793628000000,"fv":3.0809,"lo":2.9149,"hi":3.247,"session":"EXTENDED","venues":{"venue-a":3.0815,"venue-b":3.0815,"venue-c":3.0815,"offshore":3.0822}},{"ts":1793631600000,"fv":3.0933,"lo":2.9974,"hi":3.1892,"session":"REGULAR","venues":{"venue-a":3.0869,"venue-b":3.0869,"venue-c":3.0869,"offshore":3.0997}}]},"bestEx":{"orders":843,"filled":777,"partial":2,"rejected":64,"avgSlippageVsFairBps":8.96,"avgImprovementVsBestSingleVenueBps":0.84,"venues":[{"venueId":"venue-a","legs":412,"shares":44333.3433,"notional":2106720.2,"shareOfVolumePct":43.16,"avgVsFairBps":59.58},{"venueId":"venue-b","legs":52,"shares":47173.9299,"notional":1015374.04,"shareOfVolumePct":20.8,"avgVsFairBps":106.26},{"venueId":"venue-c","legs":59,"shares":24643.2395,"notional":842580.03,"shareOfVolumePct":17.26,"avgVsFairBps":95.02},{"venueId":"primary","legs":216,"shares":23176.0791,"notional":542217.28,"shareOfVolumePct":11.11,"avgVsFairBps":1.28},{"venueId":"offshore","legs":151,"shares":13352.5091,"notional":373782.59,"shareOfVolumePct":7.66,"avgVsFairBps":8.37}],"rejectionReasons":{"router not whitelisted by venue":37,"jurisdiction blocked":640,"token delivery requested (on-chain only)":507,"eligible but not competitive / capacity":1172,"jurisdiction not eligible":594,"venue closed this session":86,"symbol halted":4,"monthly volume cap exhausted":265}},"caps":[{"venueId":"venue-a","tier":1,"symbol":"AAPL","cap":56249.99999999999,"used":5310.7078,"remaining":50939.2922,"utilisationPct":9.44,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-a","tier":1,"symbol":"NVDA","cap":1574.9999999999764,"used":1575,"remaining":0,"utilisationPct":100,"projectedExhaustionDay":29,"status":"EXHAUSTED"},{"venueId":"venue-a","tier":1,"symbol":"TSLA","cap":90000,"used":704.4958,"remaining":89295.5042,"utilisationPct":0.78,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-a","tier":1,"symbol":"AMC","cap":50000,"used":36743.1397,"remaining":13256.8603,"utilisationPct":73.49,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-b","tier":1,"symbol":"AAPL","cap":67500,"used":2000,"remaining":65500,"utilisationPct":2.96,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-b","tier":1,"symbol":"NVDA","cap":1889.9999999999718,"used":1890,"remaining":0,"utilisationPct":100,"projectedExhaustionDay":29,"status":"EXHAUSTED"},{"venueId":"venue-b","tier":1,"symbol":"TSLA","cap":108000,"used":0,"remaining":108000,"utilisationPct":0,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-b","tier":1,"symbol":"AMC","cap":60000,"used":43283.9299,"remaining":16716.0701,"utilisationPct":72.14,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-c","tier":1,"symbol":"AAPL","cap":33750,"used":2280,"remaining":31470,"utilisationPct":6.76,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-c","tier":1,"symbol":"NVDA","cap":944.9999999999859,"used":945,"remaining":0,"utilisationPct":100,"projectedExhaustionDay":29,"status":"EXHAUSTED"},{"venueId":"venue-c","tier":1,"symbol":"TSLA","cap":54000,"used":0,"remaining":54000,"utilisationPct":0,"projectedExhaustionDay":null,"status":"OK"},{"venueId":"venue-c","tier":1,"symbol":"AMC","cap":30000,"used":21418.2395,"remaining":8581.7605,"utilisationPct":71.39,"projectedExhaustionDay":null,"status":"OK"}],"audit":{"entries":1710,"head":"0xcd3ea9f3ce2f24d0a2a19e1dbb45c8e05e887a05b641a8ece5a7edf90dcc96a2","verified":true,"anchors":[{"ts":1793062800000,"head":"0x05f9d2c80932a9d2cfa15a5b866ecfb52caeec3cc239f8666b0c41a51c9bd4c0","fromSeq":0,"toSeq":253},{"ts":1793149200000,"head":"0x5712cc53eed9b889f80d89b823702934457770cb708f72744ec2371a1bb85e1f","fromSeq":254,"toSeq":542},{"ts":1793235600000,"head":"0xcfe47c63b29f14d6dfcbe5c0bea91ab6bbd1b587d1738b5dd169d43de0d844b2","fromSeq":543,"toSeq":851},{"ts":1793322000000,"head":"0xae6f0717640fb5330e48cc6a65d2849eda047b3138471f5d10aad5cd4cdbded7","fromSeq":852,"toSeq":1138},{"ts":1793408400000,"head":"0xe766647278efe277a44b8b34107c79e6e1617196636b2bfb589884a2bea04773","fromSeq":1139,"toSeq":1428},{"ts":1793494800000,"head":"0xe1b6f8cf5b3f07d7569dc270b1275a318cd4b48093802d198e9fab38fb3fd96a","fromSeq":1429,"toSeq":1503},{"ts":1793581200000,"head":"0x415ba5c7c9f753db885e0fc66d36e21ef3549abc124eba5bc5fd194134cdb8c1","fromSeq":1504,"toSeq":1601},{"ts":1793631600000,"head":"0xcd3ea9f3ce2f24d0a2a19e1dbb45c8e05e887a05b641a8ece5a7edf90dcc96a2","fromSeq":1602,"toSeq":1709}]}},"onchain":{"chainTime":1793025183,"results":[{"step":"Weekend Guard posts fair value","ok":true,"detail":"$200.00 ±10bps (REGULAR)"},{"step":"Read monthly cap headroom","ok":true,"detail":"10,000 of 10,000 shares left (Tier 1, 0.25% of ADV)"},{"step":"US customer buys $10,000 of AAPL","ok":true,"detail":"49.826 shares @ $200.70"},{"step":"UK customer sells 10 shares","ok":true,"detail":"received $1995.75"},{"step":"Wallet with no credential tries to buy","ok":true,"detail":"refused on-chain → NoCredential(0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc)"},{"step":"Exchange halts AAPL: order during halt","ok":true,"detail":"refused on-chain → Halted(\"AAPL\", \"LULD\")"},{"step":"Halt lifted: same order","ok":true,"detail":"filled"},{"step":"Customer grants AI agent a mandate","ok":true,"detail":"$2,000/trade, $5,000/day, buys only"},{"step":"Agent buys $1,500 for the customer","ok":true,"detail":"7.471 shares delivered to customer 0x709979…"},{"step":"Agent tries $3,000 (over per-trade limit)","ok":true,"detail":"refused on-chain → PerTradeLimit($3,000 > $2,000)"},{"step":"Agent tries to sell (not allowed)","ok":true,"detail":"refused on-chain → SellsNotAllowed()"},{"step":"$600,000 market buy (would dislocate price)","ok":true,"detail":"refused on-chain → PriceOutOfBand(post-trade $212.07 vs band $193.8–$206.2)"},{"step":"Cap basis revised (ADV 200k → cap 500 sh)","ok":true,"detail":"430.213 shares of headroom left"},{"step":"Sell 435.2 shares (over cap)","ok":true,"detail":"refused on-chain → CapExceeded(\"AAPL\": would reach 505 sh, cap 500 sh)"},{"step":"Engine sizes the order to headroom instead","ok":true,"detail":"filled; headroom now 0.000000 shares"},{"step":"Fair value 3 min old (limit 2 min)","ok":true,"detail":"refused on-chain → StaleFairValue(\"AAPL\", 1793025003)"},{"step":"Engine reposts; order retried","ok":true,"detail":"filled"},{"step":"Dividend $0.26/share on record-date balance","ok":true,"detail":"customer held 632.085 sh → paid $164.34"},{"step":"Audit log anchored on-chain","ok":true,"detail":"28 entries, head 0x13fc1c7b0c66… verified=true"}],"auditHead":"0x13fc1c7b0c665709dc0b9fa2148ca6e3a5b760ca478a90f4249a9432983597e1"},"playground":{"prices":{"AAPL":260,"NVDA":185,"TSLA":430,"AMC":3.2},"vol":{"AAPL":0.24,"NVDA":0.45,"TSLA":0.6,"AMC":0.9},"beta":{"AAPL":1.1,"NVDA":1.7,"TSLA":2,"AMC":1.4},"adv":{"AAPL":50000000,"NVDA":180000000,"TSLA":90000000,"AMC":25000000},"capUsed":{"AAPL":0.55,"NVDA":0.9965,"TSLA":0.6,"AMC":0.2}}};
+(function () {
+  const E = window.FletcheryEngine;
+  const S = DATA.scenario, OC = DATA.onchain;
+  const VCOL = { 'venue-a': 'var(--v1)', 'venue-b': 'var(--v2)', 'venue-c': 'var(--v3)', 'offshore': 'var(--v4)', 'primary': 'var(--v5)' };
+  const VNAME = Object.fromEntries(S.venues.map(v => [v.id, v.name]));
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const usd = (x, d = 2) => '$' + Number(x).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const int = x => Math.round(x).toLocaleString('en-US');
+  const bps = x => (x >= 0 ? '+' : '') + x.toFixed(1) + ' bps';
+  const nyFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const ny = ts => nyFmt.format(new Date(ts));
+
+  // ── KPIs ──
+  const be = S.bestEx;
+  const refused = be.rejected;
+  const kpis = [
+    ['Orders routed', int(be.orders), `${int(be.filled)} filled · ${int(be.partial)} partial`],
+    ['Refused with a reason', int(refused), 'mandate limits, halts, caps, no eligible venue'],
+    ['Avg fill vs fair value', bps(be.avgSlippageVsFairBps), 'across all filled orders'],
+    ['Better than best single venue', bps(be.avgImprovementVsBestSingleVenueBps ?? 0), 'average, orders both could fill'],
+    ['Audit log', S.audit.verified ? 'Intact' : 'Broken', `${int(S.audit.entries)} entries · ${S.audit.anchors.length} on-chain anchors`],
+  ];
+  $('kpis').innerHTML = kpis.map(([k, v, d]) => `<div class="kpi"><div class="eyebrow">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+
+  // ── Router playground ──
+  const P = DATA.playground;
+  let venues;
+  function freshVenues() {
+    const late = $('t-cap').checked;
+    const capUsed = late ? Object.fromEntries(Object.keys(P.prices).map(s => [s, 0.95])) : P.capUsed;
+    venues = E.defaultVenues(P.prices, { adv: P.adv, capUsed });
+    for (const v of venues) { const p = v.pools.AMC; if (p && v.kind !== 'PRIMARY') { p.stock /= 80; p.cash /= 80; } }
+  }
+  function runRoute() {
+    const sym = $('f-sym').value;
+    const ts = Date.parse($('f-when').value);
+    for (const v of venues) {
+      v.fletcheryWhitelisted = v.id === 'venue-b' ? $('t-wl').checked : true;
+      $('t-halt').checked ? v.halted.add(sym) : v.halted.delete(sym);
+    }
+    const sess = E.sessionAt(ts);
+    const open = sess === E.Session.REGULAR || sess === E.Session.EXTENDED;
+    const ref = { symbol: sym, lastClose: P.prices[sym], nbboMid: open ? P.prices[sym] : undefined, annualVol: P.vol[sym], beta: P.beta[sym], observations: [] };
+    const fv = E.computeFairValue(ref, ts);
+    const shares = Math.max(1, Number($('f-sh').value) || 1);
+    const order = { id: 'demo', account: 'demo', jurisdiction: Number($('f-cl').value), symbol: sym, side: $('f-side').value, shares, delivery: $('f-del').value, tsMs: ts };
+    const plan = E.route(order, venues, fv);
+    renderPlan(plan, fv, order);
+  }
+  function renderPlan(plan, fv, order) {
+    const total = plan.filled || 0;
+    const legs = [...plan.legs].sort((a, b) => b.shares - a.shares);
+    const sessName = E.SESSION_NAME[plan.session];
+    const status = plan.filled <= 1e-9 ? ['bad', 'Not routable'] : plan.unfilled > 1e-6 ? ['warn', `Partial · ${int(plan.unfilled)} unfilled`] : ['ok', 'Fully routable'];
+    const bar = total > 0
+      ? `<div class="alloc" role="img" aria-label="Allocation by venue">${legs.map(l => `<div title="${esc(VNAME[l.venueId])}: ${int(l.shares)} shares" style="flex-grow:${l.shares};background:${VCOL[l.venueId]}"></div>`).join('')}</div>`
+      : `<div class="alloc-empty" role="img" aria-label="No allocation"></div>`;
+    const improve = plan.improvementVsSingleBps !== undefined
+      ? `${bps(plan.improvementVsSingleBps)} better than the best single venue (${esc(VNAME[plan.bestSingleVenue.venueId])})`
+      : plan.bestSingleVenue ? `best single venue could fill only ${int(plan.bestSingleVenue.filled)} shares` : '';
+    const rows = legs.map(l => `<tr><td><span class="legend"><span><i class="sw" style="background:${VCOL[l.venueId]}"></i>${esc(VNAME[l.venueId])}</span></span></td><td class="r">${int(l.shares)}</td><td class="r">${(l.shares / total * 100).toFixed(1)}%</td><td class="r">${usd(l.avgPrice, l.avgPrice < 10 ? 4 : 2)}</td><td class="r">${usd(l.postPrice, l.postPrice < 10 ? 4 : 2)}</td></tr>`).join('');
+    const skipped = plan.rejected.filter(r => r.reason !== 'eligible but not competitive / capacity' || true).map(r => `<tr><td>${esc(VNAME[r.venueId])}</td><td class="muted">${esc(r.reason)}</td></tr>`).join('');
+    $('result').innerHTML = `
+      <div class="headline">
+        <span class="chip ${status[0]}">${status[1]}</span>
+        ${total > 0 ? `<span class="big">${int(total)} sh @ ${usd(plan.avgPrice, plan.avgPrice < 10 ? 4 : 2)}</span>` : ''}
+        <span class="muted small">Fair value ${usd(fv.price, fv.price < 10 ? 4 : 2)} · band ${usd(fv.lowBand, fv.price < 10 ? 3 : 2)}–${usd(fv.highBand, fv.price < 10 ? 3 : 2)} · ${sessName}</span>
+      </div>
+      ${bar}
+      ${total > 0 ? `<p class="small muted">${bps(plan.slippageVsFairBps)} vs fair value${improve ? ' · ' + improve : ''}</p>` : ''}
+      <div class="grid2">
+        <div class="tbl-wrap">${legs.length ? `<table><thead><tr><th>Venue</th><th class="r">Shares</th><th class="r">Share</th><th class="r">Avg price</th><th class="r">Pool after</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted small">No venue can take this order right now. The reasons are listed alongside.</p>'}</div>
+        <div class="tbl-wrap"><table><thead><tr><th>Venue not used</th><th>Reason</th></tr></thead><tbody>${skipped || '<tr><td colspan="2" class="muted">Every venue took part.</td></tr>'}</tbody></table></div>
+      </div>`;
+  }
+  freshVenues(); runRoute();
+  for (const id of ['f-sym', 'f-side', 'f-sh', 'f-cl', 'f-when', 'f-del', 't-wl', 't-halt']) $(id).addEventListener('input', runRoute);
+  $('t-cap').addEventListener('input', () => { freshVenues(); runRoute(); });
+  $('reset').addEventListener('click', () => { freshVenues(); runRoute(); });
+
+  // ── Weekend Guard chart ──
+  const SYMS = Object.keys(S.samples);
+  let curSym = 'AMC';
+  $('sym-seg').innerHTML = SYMS.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === curSym}">${s}</button>`).join('');
+  $('sym-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; curSym = b.dataset.s; for (const x of $('sym-seg').children) x.setAttribute('aria-pressed', x.dataset.s === curSym); drawGuard(); });
+  const GV = ['venue-a', 'venue-b', 'venue-c', 'offshore'];
+  $('guard-legend').innerHTML = `<span><i class="sw line" style="background:var(--ink)"></i>Fair value</span><span><i class="sw" style="background:var(--band);border:1px solid var(--rule-strong)"></i>Allowed band</span>` + GV.map(v => `<span><i class="sw line" style="background:${VCOL[v]}"></i>${esc(VNAME[v])}${/pool$/i.test(VNAME[v]) ? '' : ' pool'}</span>`).join('') + `<span><i class="sw" style="background:var(--closed);border:1px solid var(--rule)"></i>Exchange shut</span>`;
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+    const t = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) t.push(+v.toFixed(6));
+    return t;
+  }
+  function drawGuard() {
+    const pts = S.samples[curSym];
+    const host = $('guard-chart');
+    const W = Math.max(320, host.clientWidth || 900), H = W < 560 ? 260 : 320;
+    const m = { l: 56, r: 12, t: 10, b: 28 };
+    const x0 = pts[0].ts, x1 = pts[pts.length - 1].ts;
+    let lo = Infinity, hi = -Infinity;
+    for (const p of pts) { lo = Math.min(lo, p.lo, ...GV.map(v => p.venues[v])); hi = Math.max(hi, p.hi, ...GV.map(v => p.venues[v])); }
+    const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+    const X = t => m.l + (t - x0) / (x1 - x0) * (W - m.l - m.r);
+    const Y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+    const dec = hi < 10 ? 2 : 0;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${curSym} fair value, band and venue pool prices over the week">`;
+    // shut-exchange columns
+    for (let i = 0; i < pts.length - 1; i++) if (pts[i].session === 'CLOSED' || pts[i].session === 'OVERNIGHT') {
+      svg += `<rect x="${X(pts[i].ts)}" y="${m.t}" width="${X(pts[i + 1].ts) - X(pts[i].ts) + 0.5}" height="${H - m.t - m.b}" fill="var(--closed)"/>`;
+    }
+    for (const t of niceTicks(lo, hi, 5)) svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--rule)" stroke-width="1"/><text x="${m.l - 8}" y="${Y(t) + 4}" text-anchor="end">${t.toFixed(dec)}</text>`;
+    // day ticks at New York midnight
+    const days = []; for (const p of pts) { const h = ny(p.ts); if (h.endsWith('00:00')) days.push(p); }
+    for (const d of days) { const lab = ny(d.ts).slice(0, 3); svg += `<line x1="${X(d.ts)}" x2="${X(d.ts)}" y1="${H - m.b}" y2="${H - m.b + 4}" stroke="var(--rule-strong)"/><text x="${X(d.ts) + 4}" y="${H - 8}">${lab}</text>`; }
+    const band = pts.map(p => `${X(p.ts)},${Y(p.hi)}`).join(' ') + ' ' + [...pts].reverse().map(p => `${X(p.ts)},${Y(p.lo)}`).join(' ');
+    svg += `<polygon points="${band}" fill="var(--band)" fill-opacity="0.85" stroke="var(--rule-strong)" stroke-width="1"/>`;
+    for (const v of GV) svg += `<polyline points="${pts.map(p => `${X(p.ts)},${Y(p.venues[v])}`).join(' ')}" fill="none" stroke="${VCOL[v]}" stroke-width="1.5" stroke-linejoin="round" opacity="0.9"/>`;
+    svg += `<polyline points="${pts.map(p => `${X(p.ts)},${Y(p.fv)}`).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2.25" stroke-linejoin="round"/>`;
+    // events on this symbol
+    for (const e of S.timeline.filter(e => e.kind === 'guard' && e.title.includes(curSym))) svg += `<line x1="${X(e.ts)}" x2="${X(e.ts)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="${X(e.ts) > W * 0.6 ? X(e.ts) - 5 : X(e.ts) + 5}" text-anchor="${X(e.ts) > W * 0.6 ? 'end' : 'start'}" y="${m.t + 12}" style="fill:var(--accent)">${esc(e.title.split(' ').slice(0, 4).join(' '))}</text>`;
+    svg += `<line id="xh" y1="${m.t}" y2="${H - m.b}" stroke="var(--ink-3)" stroke-width="1" visibility="hidden"/><circle id="xd" r="4" fill="var(--ink)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>`;
+    svg += `<rect x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent" id="hit"/></svg><div class="tip" id="tip" hidden></div>`;
+    host.innerHTML = svg;
+    const hit = host.querySelector('#hit'), tip = host.querySelector('#tip'), xh = host.querySelector('#xh'), xd = host.querySelector('#xd');
+    const svgEl = host.querySelector('svg');
+    const move = ev => {
+      const r = svgEl.getBoundingClientRect(); const sx = (ev.clientX - r.left) * W / r.width;
+      const t = x0 + (sx - m.l) / (W - m.l - m.r) * (x1 - x0);
+      let p = pts[0]; for (const q of pts) if (Math.abs(q.ts - t) < Math.abs(p.ts - t)) p = q;
+      xh.setAttribute('x1', X(p.ts)); xh.setAttribute('x2', X(p.ts)); xh.setAttribute('visibility', 'visible');
+      xd.setAttribute('cx', X(p.ts)); xd.setAttribute('cy', Y(p.fv)); xd.setAttribute('visibility', 'visible');
+      const f = v => usd(v, p.fv < 10 ? 3 : 2);
+      tip.innerHTML = `<b>${ny(p.ts)} New York · ${p.session.toLowerCase()}</b><div class="row"><span>Fair value</span><span>${f(p.fv)}</span></div><div class="row"><span>Band</span><span>${f(p.lo)}–${f(p.hi)}</span></div>` + GV.map(v => `<div class="row"><span><i class="sw" style="background:${VCOL[v]}"></i> ${esc(VNAME[v])}</span><span>${f(p.venues[v])}</span></div>`).join('');
+      tip.hidden = false;
+      const px = X(p.ts) * r.width / W; const tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, px + 14), r.width - tw) + 'px'; tip.style.top = '8px';
+      if (px + 14 + tw > r.width) tip.style.left = Math.max(0, px - tw - 14) + 'px';
+    };
+    hit.addEventListener('pointermove', move);
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); xd.setAttribute('visibility', 'hidden'); });
+  }
+  drawGuard();
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawGuard, 120); });
+
+  // ── Caps ──
+  const capCls = { OK: ['ok', 'OK'], WATCH: ['warn', 'Watch'], EXHAUSTED: ['bad', 'Cap reached'] };
+  $('caps').innerHTML = S.caps.map(c => {
+    const pct = Math.min(100, c.utilisationPct);
+    const col = c.status === 'EXHAUSTED' ? 'var(--bad)' : c.status === 'WATCH' ? 'var(--warn)' : 'var(--accent)';
+    return `<div class="cap-row"><div class="small"><b>${c.symbol}</b> <span class="muted">· ${esc(VNAME[c.venueId])}</span></div><div class="cap-bar" title="${int(c.used)} of ${int(c.cap)} shares"><div style="width:${pct}%;background:${col}"></div></div><div style="display:flex;gap:8px;justify-content:end;align-items:center"><span class="num small">${pct.toFixed(0)}%</span><span class="chip ${capCls[c.status][0]}">${capCls[c.status][1]}</span></div></div>`;
+  }).join('');
+
+  // ── Best execution ──
+  $('share-bar').innerHTML = be.venues.map(v => `<div title="${esc(VNAME[v.venueId])} ${v.shareOfVolumePct}%" style="flex-grow:${v.notional};background:${VCOL[v.venueId]}"></div>`).join('');
+  $('bx').innerHTML = `<thead><tr><th>Venue</th><th class="r">Volume</th><th class="r">Fills</th><th class="r">vs fair value</th></tr></thead><tbody>` + be.venues.map(v => `<tr><td><span class="legend"><span><i class="sw" style="background:${VCOL[v.venueId]}"></i>${esc(VNAME[v.venueId])}</span></span></td><td class="r">${v.shareOfVolumePct.toFixed(1)}%</td><td class="r">${int(v.legs)}</td><td class="r">${bps(v.avgVsFairBps)}</td></tr>`).join('') + '</tbody>';
+  const reasons = Object.entries(be.rejectionReasons).filter(([r]) => !r.startsWith('eligible but')).sort((a, b) => b[1] - a[1]);
+  $('reasons').innerHTML = `<thead><tr><th>Reason</th><th class="r">Times</th></tr></thead><tbody>` + reasons.map(([r, n]) => `<tr><td>${esc(r)}</td><td class="r">${int(n)}</td></tr>`).join('') + '</tbody>';
+
+  // ── Timeline ──
+  const KIND = { route: ['info', 'Execution'], access: ['info', 'Access'], halt: ['warn', 'Safety · halt'], reject: ['bad', 'Refused'], agent: ['info', 'AI agent'], cap: ['warn', 'Compliance · cap'], guard: ['warn', 'Weekend Guard'] };
+  $('timeline').innerHTML = S.timeline.map(e => `<li><div class="when">${ny(e.ts)}</div><div class="what"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip ${KIND[e.kind][0]}">${KIND[e.kind][1]}</span><b>${esc(e.title)}</b></div><span class="muted small">${esc(e.detail)}</span></div></li>`).join('');
+
+  // ── On-chain proof ──
+  const ok = OC.results.filter(r => r.ok).length;
+  $('oc-score').textContent = `${ok}/${OC.results.length} behaved as designed`;
+  $('steps').innerHTML = `<thead><tr><th></th><th>Step</th><th>What the chain returned</th></tr></thead><tbody>` + OC.results.map(r => {
+    const refusedStep = r.detail.startsWith('refused');
+    const m = !r.ok ? '<span class="mark no">!</span>' : refusedStep ? '<span class="mark no" title="Refused, as intended">✕</span>' : '<span class="mark ok">✓</span>';
+    return `<tr><td>${m}</td><td>${esc(r.step)}</td><td class="${refusedStep ? 'mono small' : 'small'}">${esc(r.detail.replace('refused on-chain → ', 'Refused: '))}</td></tr>`;
+  }).join('') + '</tbody>';
+  $('oc-head').textContent = OC.auditHead;
+  $('foot-meta').textContent = `Simulation generated ${new Date(S.generatedAt).toUTCString()} · on-chain run at chain time ${new Date(OC.chainTime * 1000).toUTCString()}.`;
+})();
+</script>
